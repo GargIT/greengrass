@@ -45,6 +45,7 @@ router.get('/periods', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -68,6 +69,7 @@ router.post('/periods', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -111,6 +113,7 @@ router.get('/quarterly', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -154,6 +157,7 @@ router.get('/monthly', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -361,6 +365,7 @@ router.post('/generate', async (req, res, next) => {
     }
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -424,6 +429,7 @@ router.get('/reconciliation/:serviceId/:periodId', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 

@@ -22,8 +22,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 import { authenticate } from './middleware/auth';
 
-// Import Swagger configuration
-import { setupSwagger } from './config/swagger';
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,7 +36,7 @@ const limiter = rateLimit({
 
 // Middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for development to fix Swagger UI
+  contentSecurityPolicy: false, // Disable CSP for development
 })); // Security headers
 app.use(compression()); // Gzip compression
 app.use(limiter); // Rate limiting
@@ -49,8 +48,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Setup Swagger
-setupSwagger(app);
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {

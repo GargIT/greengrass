@@ -15,37 +15,6 @@ const householdSchema = z.object({
   annualMemberFee: z.number().min(0).optional(),
 });
 
-/**
- * @swagger
- * tags:
- *   name: Households
- *   description: Household management endpoints
- */
-
-/**
- * @swagger
- * /api/households:
- *   get:
- *     summary: Get all active households
- *     tags: [Households]
- *     responses:
- *       200:
- *         description: List of households
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Household'
- *       500:
- *         $ref: '#/components/responses/InternalError'
- */
 // GET /api/households
 router.get('/', async (req, res, next) => {
   try {
@@ -68,6 +37,7 @@ router.get('/', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -112,6 +82,7 @@ router.get('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -133,70 +104,10 @@ router.post('/', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
-/**
- * @swagger
- * /api/households:
- *   post:
- *     summary: Create a new household
- *     tags: [Households]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - householdNumber
- *               - ownerName
- *             properties:
- *               householdNumber:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 14
- *                 example: 1
- *               ownerName:
- *                 type: string
- *                 example: "John Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "john.doe@example.com"
- *               phone:
- *                 type: string
- *                 example: "070-123-4567"
- *               address:
- *                 type: string
- *                 example: "Gröngräset 1"
- *               andelstal:
- *                 type: number
- *                 minimum: 0
- *                 maximum: 1
- *                 example: 0.07142857
- *               annualMemberFee:
- *                 type: number
- *                 minimum: 0
- *                 example: 3000
- *     responses:
- *       201:
- *         description: Household created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/Household'
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       500:
- *         $ref: '#/components/responses/InternalError'
- */
 // POST /api/households
 
 // PUT /api/households/:id
@@ -227,6 +138,7 @@ router.put('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -251,6 +163,7 @@ router.delete('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -306,6 +219,7 @@ router.put('/recalculate-ratios', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 

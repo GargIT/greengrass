@@ -527,7 +527,11 @@ const UtilityServices: React.FC = () => {
                   type="number"
                   label="Pris per enhet"
                   value={formData.unitPrice}
-                  onChange={(e) => handleInputChange('unitPrice', parseFloat(e.target.value))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const numValue = value === '' ? 0 : parseFloat(value);
+                    handleInputChange('unitPrice', isNaN(numValue) ? 0 : numValue);
+                  }}
                   inputProps={{ min: 0, step: 0.01 }}
                   endAdornment={<InputAdornment position="end">kr</InputAdornment>}
                 />

@@ -9,11 +9,11 @@ const utilityServiceSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
   unit: z.string().min(1).max(20),
-  unitPrice: z.number().min(0).optional(),
-  serviceType: z.enum(['WATER', 'ELECTRICITY', 'HEATING', 'INTERNET', 'OTHER']).optional(),
-  isActive: z.boolean().optional(),
-  isMandatory: z.boolean().optional(),
-  billingFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY']).optional(),
+  unitPrice: z.number().min(0).default(0),
+  serviceType: z.enum(['WATER', 'ELECTRICITY', 'HEATING', 'INTERNET', 'OTHER']).default('OTHER'),
+  isActive: z.boolean().default(true),
+  isMandatory: z.boolean().default(false),
+  billingFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY']).default('QUARTERLY'),
 });
 
 // GET /api/utility-services
@@ -42,6 +42,7 @@ router.get('/', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -84,13 +85,25 @@ router.get('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
 // POST /api/utility-services
 router.post('/', async (req, res, next) => {
   try {
-    const validatedData = utilityServiceSchema.parse(req.body);
+    console.log('POST request body:', JSON.stringify(req.body, null, 2));
+    
+    // Preprocess the data to handle type conversions
+    const preprocessedData = {
+      ...req.body,
+      unitPrice: req.body.unitPrice !== undefined && req.body.unitPrice !== null && !isNaN(Number(req.body.unitPrice)) 
+        ? Number(req.body.unitPrice) 
+        : 0,
+    };
+    
+    const validatedData = utilityServiceSchema.parse(preprocessedData);
+    console.log('Validated data:', JSON.stringify(validatedData, null, 2));
 
     const service = await prisma.utilityService.create({
       data: validatedData,
@@ -100,8 +113,21 @@ router.post('/', async (req, res, next) => {
       success: true,
       data: service,
     });
+    return;
   } catch (error) {
+    console.error('POST /api/utility-services error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors.reduce((acc, err) => {
+          acc[err.path.join('.')] = err.message;
+          return acc;
+        }, {} as Record<string, string>)
+      });
+    }
     next(error);
+    return;
   }
 });
 
@@ -109,7 +135,18 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const validatedData = utilityServiceSchema.partial().parse(req.body);
+    console.log('PUT request body:', JSON.stringify(req.body, null, 2));
+    
+    // Preprocess the data to handle type conversions
+    const preprocessedData = {
+      ...req.body,
+      unitPrice: req.body.unitPrice !== undefined && req.body.unitPrice !== null && !isNaN(Number(req.body.unitPrice)) 
+        ? Number(req.body.unitPrice) 
+        : undefined, // Keep as undefined for updates if not provided
+    };
+    
+    const validatedData = utilityServiceSchema.partial().parse(preprocessedData);
+    console.log('Validated data:', JSON.stringify(validatedData, null, 2));
 
     const service = await prisma.utilityService.update({
       where: { id },
@@ -120,8 +157,21 @@ router.put('/:id', async (req, res, next) => {
       success: true,
       data: service,
     });
+    return;
   } catch (error) {
+    console.error('PUT /api/utility-services/:id error:', error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors.reduce((acc, err) => {
+          acc[err.path.join('.')] = err.message;
+          return acc;
+        }, {} as Record<string, string>)
+      });
+    }
     next(error);
+    return;
   }
 });
 
@@ -157,7 +207,7 @@ router.delete('/:id', async (req, res, next) => {
                           service._count.utilityBilling > 0;
 
     if (hasRelatedData) {
-      // Soft delete by setting isActive to false
+      // Soft delete by setting isActive to false when service is in use
       await prisma.utilityService.update({
         where: { id },
         data: { isActive: false },
@@ -165,21 +215,34 @@ router.delete('/:id', async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: 'Utility service deactivated (soft delete)',
+        message: 'Utility service deactivated because it has related data (meters or billing records)',
+        data: {
+          action: 'soft_delete',
+          relatedData: {
+            mainMeters: service._count.mainMeters,
+            householdMeters: service._count.householdMeters,
+            billingRecords: service._count.utilityBilling
+          }
+        }
       });
     } else {
-      // Hard delete if no related data
+      // Hard delete if no related data - service can be safely removed
       await prisma.utilityService.delete({
         where: { id },
       });
 
       return res.json({
         success: true,
-        message: 'Utility service deleted',
+        message: 'Utility service permanently deleted',
+        data: {
+          action: 'hard_delete',
+          deletedServiceId: id
+        }
       });
     }
   } catch (error) {
     next(error);
+    return;
   }
 });
 

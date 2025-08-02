@@ -72,7 +72,7 @@ router.post('/login', async (req, res, next) => {
     // Return user data (without password) and tokens
     const { password, ...userWithoutPassword } = user;
     
-    res.json({
+    return res.json({
       success: true,
       data: {
         user: userWithoutPassword,
@@ -82,6 +82,7 @@ router.post('/login', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -134,7 +135,7 @@ router.post('/register', async (req, res, next) => {
     // Return user data (without password) and tokens
     const { password, ...userWithoutPassword } = user;
     
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: {
         user: userWithoutPassword,
@@ -144,6 +145,7 @@ router.post('/register', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -171,6 +173,7 @@ router.post('/logout', authenticate, async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -180,34 +183,25 @@ router.get('/me', authenticate, async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       include: { household: true },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true,
-        householdId: true,
-        household: true,
-      },
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found',
-        message: 'The authenticated user was not found',
       });
     }
 
-    res.json({
+    // Remove sensitive data
+    const { password, ...userWithoutPassword } = user;
+
+    return res.json({
       success: true,
-      data: { user },
+      data: userWithoutPassword,
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 

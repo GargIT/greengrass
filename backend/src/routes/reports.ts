@@ -100,6 +100,7 @@ router.get('/dashboard', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -196,6 +197,7 @@ router.get('/consumption/:serviceId', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -291,6 +293,7 @@ router.get('/billing/:periodId', async (req, res, next) => {
     }
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -374,6 +377,7 @@ router.get('/payments', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -396,6 +400,7 @@ router.get('/export/:type', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 

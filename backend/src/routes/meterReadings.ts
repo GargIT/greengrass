@@ -125,6 +125,7 @@ router.get('/', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -186,6 +187,7 @@ router.get('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -257,6 +259,7 @@ router.post('/', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -320,6 +323,7 @@ router.put('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -350,6 +354,7 @@ router.delete('/:id', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
@@ -416,6 +421,7 @@ router.post('/bulk', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+    return;
   }
 });
 
