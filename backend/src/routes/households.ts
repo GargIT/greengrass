@@ -6,7 +6,7 @@ const router = Router();
 
 // Validation schemas
 const householdSchema = z.object({
-  householdNumber: z.number().int().min(1).max(14),
+  householdNumber: z.number().int().min(1),
   ownerName: z.string().min(1).max(255),
   email: z.string().email().optional(),
   phone: z.string().max(20).optional(),
@@ -124,6 +124,9 @@ router.post('/', async (req, res, next) => {
       data: validatedData,
     });
 
+    // Update ownership ratios for all households after creating a new one
+    await updateOwnershipRatios();
+
     res.status(201).json({
       success: true,
       data: household,
@@ -202,6 +205,9 @@ router.put('/:id', async (req, res, next) => {
     const { id } = req.params;
     const validatedData = householdSchema.partial().parse(req.body);
 
+    // Check if isActive status is being changed
+    const isActiveChanged = validatedData.hasOwnProperty('isActive');
+
     const household = await prisma.household.update({
       where: { id },
       data: {
@@ -209,6 +215,11 @@ router.put('/:id', async (req, res, next) => {
         updatedAt: new Date(),
       },
     });
+
+    // Update ownership ratios if active status changed
+    if (isActiveChanged) {
+      await updateOwnershipRatios();
+    }
 
     res.json({
       success: true,
@@ -230,10 +241,68 @@ router.delete('/:id', async (req, res, next) => {
       data: { isActive: false },
     });
 
+    // Update ownership ratios after deactivating a household
+    await updateOwnershipRatios();
+
     res.json({
       success: true,
       message: 'Household deactivated successfully',
       data: household,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Calculate and update ownership ratios (andelstal) for all active households
+ * Each household gets an equal share: 1 / total_active_households
+ */
+async function updateOwnershipRatios() {
+  try {
+    // Get count of active households
+    const activeHouseholdCount = await prisma.household.count({
+      where: { isActive: true }
+    });
+
+    if (activeHouseholdCount === 0) {
+      return;
+    }
+
+    // Calculate equal ratio for each household
+    const newRatio = 1 / activeHouseholdCount;
+
+    // Update all active households with the new ratio
+    await prisma.household.updateMany({
+      where: { isActive: true },
+      data: { andelstal: newRatio }
+    });
+
+    console.log(`Updated ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(8)} each`);
+  } catch (error) {
+    console.error('Error updating ownership ratios:', error);
+    throw error;
+  }
+}
+
+// PUT /api/households/recalculate-ratios - Admin endpoint to recalculate ownership ratios
+router.put('/recalculate-ratios', async (req, res, next) => {
+  try {
+    await updateOwnershipRatios();
+    
+    const activeHouseholds = await prisma.household.findMany({
+      where: { isActive: true },
+      select: { id: true, householdNumber: true, ownerName: true, andelstal: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Ownership ratios recalculated successfully',
+      data: {
+        totalActiveHouseholds: activeHouseholds.length,
+        newRatio: activeHouseholds.length > 0 ? activeHouseholds[0].andelstal : null,
+        households: activeHouseholds
+      }
     });
   } catch (error) {
     next(error);

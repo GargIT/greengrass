@@ -6,13 +6,14 @@ A modern web application for managing utility billing for Swedish samfällighets
 
 This system replaces an Excel-based utility billing system with a comprehensive web application that supports:
 
-- 14 households with equal share ratios (andelstal)
+- **Dynamic household management** with automatically calculated ownership ratios (andelstal)
+- Equal share distribution: each active household gets 1/N share where N = total active households
 - Quarterly mandatory meter readings (every 4th month)
 - Optional monthly readings with optional monthly billing
-- Multiple utility services (water, electricity, gas, etc.)
+- Multiple utility services (water, electricity, heating, internet, etc.)
 - Both variable (consumption-based) and fixed fees
 - Meter reconciliation between main meters and household meters
-- Flexible billing periods
+- Flexible billing periods and frequencies
 - Shared costs and member fees
 - Payment tracking
 
