@@ -13,10 +13,12 @@ dotenv.config();
 import householdRoutes from "./routes/households";
 import utilityServiceRoutes from "./routes/utilityServices";
 import householdMeterRoutes from "./routes/householdMeters";
+import mainMeterRoutes from "./routes/mainMeters";
 import meterReadingRoutes from "./routes/meterReadings";
 import billingRoutes from "./routes/billing";
 import reportsRoutes from "./routes/reports";
 import authRoutes from "./routes/auth";
+import userRoutes from "./routes/users";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler";
@@ -46,8 +48,8 @@ app.use(
   cors({
     origin: (
       process.env.CORS_ORIGIN ||
-      "http://localhost:5173" ||
-      "https://5173.code.gargit.se"
+      "http://localhost:5174" ||
+      "https://5174.code.gargit.se"
     ).split(","),
     credentials: true,
   })
@@ -67,12 +69,14 @@ app.get("/health", (req, res) => {
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", authenticate, userRoutes);
 app.use("/api/households", authenticate, householdRoutes);
 app.use("/api/utility-services", authenticate, utilityServiceRoutes);
 app.use("/api/household-meters", authenticate, householdMeterRoutes);
-app.use("/api/meter-readings", meterReadingRoutes);
-app.use("/api/billing", billingRoutes);
-app.use("/api/reports", reportsRoutes);
+app.use("/api/main-meters", authenticate, mainMeterRoutes);
+app.use("/api/meter-readings", authenticate, meterReadingRoutes);
+app.use("/api/billing", authenticate, billingRoutes);
+app.use("/api/reports", authenticate, reportsRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);
@@ -83,7 +87,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Gröngräset Backend Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
-    `🔗 CORS enabled for: ${process.env.CORS_ORIGIN || "http://localhost:5173"}`
+    `🔗 CORS enabled for: ${process.env.CORS_ORIGIN || "http://localhost:5174"}`
   );
   console.log(`📖 API Documentation available at:`);
   console.log(`   • http://localhost:${PORT}/api-docs`);

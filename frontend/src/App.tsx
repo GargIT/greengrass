@@ -12,6 +12,7 @@ import { ThemeContextProvider } from "./theme";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
+import Users from "./pages/Users";
 import Households from "./pages/Households";
 import UtilityServices from "./pages/UtilityServices";
 import HouseholdServiceConnections from "./pages/HouseholdServiceConnections";
@@ -104,6 +105,16 @@ function App() {
               element={
                 <Layout onLogout={handleLogout} fullWidth>
                   <Dashboard />
+                </Layout>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <Layout onLogout={handleLogout} fullWidth>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <Users />
+                  </ProtectedRoute>
                 </Layout>
               }
             />

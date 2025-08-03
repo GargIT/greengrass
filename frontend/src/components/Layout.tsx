@@ -34,6 +34,7 @@ import {
   Logout as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  People as PeopleIcon,
 } from "@mui/icons-material";
 
 const drawerWidth = 240;
@@ -51,6 +52,12 @@ const menuItems = [
     icon: <DashboardIcon />,
     path: "/",
     roles: ["ADMIN", "MEMBER"],
+  },
+  {
+    text: "Användare",
+    icon: <PeopleIcon />,
+    path: "/users",
+    roles: ["ADMIN"],
   },
   {
     text: "Hushåll",

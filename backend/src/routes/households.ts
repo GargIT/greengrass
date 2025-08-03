@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma';
-import { z } from 'zod';
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { z } from "zod";
 
 const router = Router();
 
@@ -11,16 +11,21 @@ const householdSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().max(20).optional(),
   address: z.string().max(255).optional(),
-  andelstal: z.number().min(0).max(1).optional(),
-  annualMemberFee: z.number().min(0).optional(),
 });
 
 // GET /api/households
-router.get('/', async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
+    let whereClause: any = { isActive: true };
+
+    // For MEMBER users, only return their own household
+    if (req.user?.role === "MEMBER" && req.user?.householdId) {
+      whereClause.id = req.user.householdId;
+    }
+
     const households = await prisma.household.findMany({
-      where: { isActive: true },
-      orderBy: { householdNumber: 'asc' },
+      where: whereClause,
+      orderBy: { householdNumber: "asc" },
       include: {
         _count: {
           select: {
@@ -42,10 +47,10 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/households/:id
-router.get('/:id', async (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const household = await prisma.household.findUnique({
       where: { id },
       include: {
@@ -54,17 +59,17 @@ router.get('/:id', async (req, res, next) => {
             service: true,
             readings: {
               take: 5,
-              orderBy: { readingDate: 'desc' },
+              orderBy: { readingDate: "desc" },
             },
           },
         },
         quarterlyBills: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
         monthlyBills: {
           take: 10,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
@@ -72,7 +77,7 @@ router.get('/:id', async (req, res, next) => {
     if (!household) {
       return res.status(404).json({
         success: false,
-        message: 'Household not found',
+        message: "Household not found",
       });
     }
 
@@ -87,7 +92,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/households
-router.post('/', async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
     const validatedData = householdSchema.parse(req.body);
 
@@ -111,13 +116,13 @@ router.post('/', async (req, res, next) => {
 // POST /api/households
 
 // PUT /api/households/:id
-router.put('/:id', async (req, res, next) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     const validatedData = householdSchema.partial().parse(req.body);
 
     // Check if isActive status is being changed
-    const isActiveChanged = validatedData.hasOwnProperty('isActive');
+    const isActiveChanged = validatedData.hasOwnProperty("isActive");
 
     const household = await prisma.household.update({
       where: { id },
@@ -143,7 +148,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/households/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -158,7 +163,7 @@ router.delete('/:id', async (req, res, next) => {
 
     res.json({
       success: true,
-      message: 'Household deactivated successfully',
+      message: "Household deactivated successfully",
       data: household,
     });
   } catch (error) {
@@ -175,7 +180,7 @@ async function updateOwnershipRatios() {
   try {
     // Get count of active households
     const activeHouseholdCount = await prisma.household.count({
-      where: { isActive: true }
+      where: { isActive: true },
     });
 
     if (activeHouseholdCount === 0) {
@@ -188,34 +193,44 @@ async function updateOwnershipRatios() {
     // Update all active households with the new ratio
     await prisma.household.updateMany({
       where: { isActive: true },
-      data: { andelstal: newRatio }
+      data: { andelstal: newRatio },
     });
 
-    console.log(`Updated ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(8)} each`);
+    console.log(
+      `Updated ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(
+        8
+      )} each`
+    );
   } catch (error) {
-    console.error('Error updating ownership ratios:', error);
+    console.error("Error updating ownership ratios:", error);
     throw error;
   }
 }
 
 // PUT /api/households/recalculate-ratios - Admin endpoint to recalculate ownership ratios
-router.put('/recalculate-ratios', async (req, res, next) => {
+router.put("/recalculate-ratios", async (req, res, next) => {
   try {
     await updateOwnershipRatios();
-    
+
     const activeHouseholds = await prisma.household.findMany({
       where: { isActive: true },
-      select: { id: true, householdNumber: true, ownerName: true, andelstal: true }
+      select: {
+        id: true,
+        householdNumber: true,
+        ownerName: true,
+        andelstal: true,
+      },
     });
 
     res.json({
       success: true,
-      message: 'Ownership ratios recalculated successfully',
+      message: "Ownership ratios recalculated successfully",
       data: {
         totalActiveHouseholds: activeHouseholds.length,
-        newRatio: activeHouseholds.length > 0 ? activeHouseholds[0].andelstal : null,
-        households: activeHouseholds
-      }
+        newRatio:
+          activeHouseholds.length > 0 ? activeHouseholds[0].andelstal : null,
+        households: activeHouseholds,
+      },
     });
   } catch (error) {
     next(error);

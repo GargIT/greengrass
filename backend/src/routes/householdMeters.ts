@@ -30,7 +30,14 @@ router.get("/", async (req, res, next) => {
     const { householdId, serviceId } = req.query;
 
     const whereClause: any = {};
-    if (householdId) whereClause.householdId = householdId as string;
+
+    // For MEMBER users, restrict to their own household
+    if (req.user?.role === "MEMBER" && req.user?.householdId) {
+      whereClause.householdId = req.user.householdId;
+    } else {
+      if (householdId) whereClause.householdId = householdId as string;
+    }
+
     if (serviceId) whereClause.serviceId = serviceId as string;
 
     const householdMeters = await prisma.householdMeter.findMany({

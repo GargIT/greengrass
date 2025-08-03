@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma';
-import { z } from 'zod';
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { z } from "zod";
 
 const router = Router();
 
@@ -22,17 +22,32 @@ const mainMeterReadingSchema = z.object({
 });
 
 // GET /api/meter-readings - Get readings for a specific period and service
-router.get('/', async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    const { serviceId, periodId, householdId, type = 'household' } = req.query;
+    const { serviceId, periodId, householdId, type = "household" } = req.query;
 
-    if (type === 'main') {
+    // For MEMBER users, restrict to their own household
+    let householdFilter = householdId as string;
+    if (req.user?.role === "MEMBER" && req.user?.householdId) {
+      householdFilter = req.user.householdId;
+    }
+
+    if (type === "main") {
+      // Main meter readings - only ADMINs can see these
+      if (req.user?.role !== "ADMIN") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Admin role required for main meter readings.",
+        });
+      }
+
       const readings = await prisma.mainMeterReading.findMany({
         where: {
-          ...(serviceId && { 
-            meter: { 
-              serviceId: serviceId as string 
-            } 
+          ...(serviceId && {
+            meter: {
+              serviceId: serviceId as string,
+            },
           }),
           ...(periodId && { billingPeriodId: periodId as string }),
         },
@@ -59,8 +74,8 @@ router.get('/', async (req, res, next) => {
           },
         },
         orderBy: [
-          { billingPeriod: { startDate: 'desc' } },
-          { meter: { meterIdentifier: 'asc' } },
+          { billingPeriod: { startDate: "desc" } },
+          { meter: { meterIdentifier: "asc" } },
         ],
       });
 
@@ -72,16 +87,16 @@ router.get('/', async (req, res, next) => {
 
     const readings = await prisma.householdMeterReading.findMany({
       where: {
-        ...(serviceId && { 
-          householdMeter: { 
-            serviceId: serviceId as string 
-          } 
+        ...(serviceId && {
+          householdMeter: {
+            serviceId: serviceId as string,
+          },
         }),
         ...(periodId && { billingPeriodId: periodId as string }),
-        ...(householdId && { 
-          householdMeter: { 
-            householdId: householdId as string 
-          } 
+        ...(householdFilter && {
+          householdMeter: {
+            householdId: householdFilter,
+          },
         }),
       },
       include: {
@@ -114,8 +129,8 @@ router.get('/', async (req, res, next) => {
         },
       },
       orderBy: [
-        { billingPeriod: { startDate: 'desc' } },
-        { householdMeter: { household: { householdNumber: 'asc' } } },
+        { billingPeriod: { startDate: "desc" } },
+        { householdMeter: { household: { householdNumber: "asc" } } },
       ],
     });
 
@@ -130,12 +145,12 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/meter-readings/:id
-router.get('/:id', async (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { type = 'household' } = req.query;
+    const { type = "household" } = req.query;
 
-    if (type === 'main') {
+    if (type === "main") {
       const reading = await prisma.mainMeterReading.findUnique({
         where: { id },
         include: {
@@ -151,7 +166,7 @@ router.get('/:id', async (req, res, next) => {
       if (!reading) {
         return res.status(404).json({
           success: false,
-          message: 'Main meter reading not found',
+          message: "Main meter reading not found",
         });
       }
 
@@ -177,7 +192,7 @@ router.get('/:id', async (req, res, next) => {
     if (!reading) {
       return res.status(404).json({
         success: false,
-        message: 'Household meter reading not found',
+        message: "Household meter reading not found",
       });
     }
 
@@ -192,13 +207,13 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/meter-readings
-router.post('/', async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
-    const { type = 'household' } = req.body;
+    const { type = "household" } = req.body;
 
-    if (type === 'main') {
+    if (type === "main") {
       const validatedData = mainMeterReadingSchema.parse(req.body);
-      
+
       const reading = await prisma.mainMeterReading.create({
         data: {
           ...validatedData,
@@ -233,7 +248,7 @@ router.post('/', async (req, res, next) => {
     if (existingReading) {
       return res.status(400).json({
         success: false,
-        message: 'Reading already exists for this meter and billing period',
+        message: "Reading already exists for this meter and billing period",
       });
     }
 
@@ -264,14 +279,14 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/meter-readings/:id
-router.put('/:id', async (req, res, next) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { type = 'household' } = req.body;
+    const { type = "household" } = req.body;
 
-    if (type === 'main') {
+    if (type === "main") {
       const validatedData = mainMeterReadingSchema.partial().parse(req.body);
-      
+
       const reading = await prisma.mainMeterReading.update({
         where: { id },
         data: {
@@ -328,19 +343,19 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/meter-readings/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { type = 'household' } = req.query;
+    const { type = "household" } = req.query;
 
-    if (type === 'main') {
+    if (type === "main") {
       await prisma.mainMeterReading.delete({
         where: { id },
       });
 
       return res.json({
         success: true,
-        message: 'Main meter reading deleted successfully',
+        message: "Main meter reading deleted successfully",
       });
     }
 
@@ -350,7 +365,7 @@ router.delete('/:id', async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: 'Household meter reading deleted successfully',
+      message: "Household meter reading deleted successfully",
     });
   } catch (error) {
     next(error);
@@ -359,19 +374,19 @@ router.delete('/:id', async (req, res, next) => {
 });
 
 // POST /api/meter-readings/bulk - Bulk create readings for a billing period
-router.post('/bulk', async (req, res, next) => {
+router.post("/bulk", async (req, res, next) => {
   try {
-    const { billingPeriodId, readings, type = 'household' } = req.body;
+    const { billingPeriodId, readings, type = "household" } = req.body;
 
     if (!billingPeriodId || !Array.isArray(readings)) {
       return res.status(400).json({
         success: false,
-        message: 'billingPeriodId and readings array are required',
+        message: "billingPeriodId and readings array are required",
       });
     }
 
-    if (type === 'main') {
-      const validatedReadings = readings.map(reading => 
+    if (type === "main") {
+      const validatedReadings = readings.map((reading) =>
         mainMeterReadingSchema.parse({
           ...reading,
           billingPeriodId,
@@ -379,7 +394,7 @@ router.post('/bulk', async (req, res, next) => {
       );
 
       const result = await prisma.$transaction(
-        validatedReadings.map(reading =>
+        validatedReadings.map((reading) =>
           prisma.mainMeterReading.create({
             data: {
               ...reading,
@@ -396,7 +411,7 @@ router.post('/bulk', async (req, res, next) => {
       });
     }
 
-    const validatedReadings = readings.map(reading => 
+    const validatedReadings = readings.map((reading) =>
       meterReadingSchema.parse({
         ...reading,
         billingPeriodId,
@@ -404,7 +419,7 @@ router.post('/bulk', async (req, res, next) => {
     );
 
     const result = await prisma.$transaction(
-      validatedReadings.map(reading =>
+      validatedReadings.map((reading) =>
         prisma.householdMeterReading.create({
           data: {
             ...reading,
