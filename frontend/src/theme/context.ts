@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { ThemeMode } from "./theme";
+import type { ThemeMode } from "./theme-simple";
 
 export interface ThemeContextType {
   mode: ThemeMode;
