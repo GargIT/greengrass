@@ -1,35 +1,219 @@
-Gröngräset# G**File:** Gröngräset.xlsx  
-**Context:** Swedish Joint Facility Association (Samfällighetsförening) - Multi-Utility Billing Platform  
-**Purpose:** Convert Excel-based utility billing system to modern React/TypeScript web application supporting water, electricity, gas, and other metered servicesgräset Excel Document Analysis & Web App Conversion Instructions
+# Gröngräset - Samfällighetsförening Utility Billing System
 
-## Document Overview
 **File:** Gröngräset.xlsx  
-**Context:** Swedish Housing Cooperative Financial Management System  
-**Purpose:** Convert Excel-based financial tracking to modern React/TypeScript web application
+**Context:** Swedish Joint Facility Association (Samfällighetsförening) - Multi-Utility Billing Platform  
+**Purpose:** Modern React/TypeScript web application for utility billing, member management, and financial tracking
 
-## Document Structure Analysis
+---
 
-### Identified Worksheets
-Based on the Excel structure, the document contains multiple worksheets:
-1. **Main Financial Sheet** (sheet1.xml) - Primary data and calculations
-2. **Secondary Data Sheet** (sheet2.xml) - Supporting data or different time periods
-3. **Multiple Data Tables** (table15-29.xml) - Structured data tables for different aspects
+## 🚀 QUICK START GUIDE
 
-### Key Functional Areas Identified
+### For New Developers
 
-#### 1. Financial Management Core
+1. **Clone project** and navigate to workspace directory
+2. **Start database**: `docker compose up -d`
+3. **Setup backend**: `cd backend && npm install && npx prisma generate && npm run dev`
+4. **Setup frontend**: `cd frontend && npm install && npm run dev`
+5. **Login**: http://localhost:5174 with `admin@grongrasset.se` / `admin123`
+
+### For Testing Today's Features
+
+- **ADMIN Login**: Full access to all households and utilities
+- **MEMBER Login**: `member@grongrasset.se` / `member123` - simplified meter reading view
+- **Key Features**: Utility services, household management, meter readings with role restrictions
+
+---
+
+## Project Status (August 4, 2025)
+
+### ✅ COMPLETED FEATURES
+
+#### Backend Infrastructure
+
+- ✅ **PostgreSQL Database**: Full schema implemented with Prisma ORM
+- ✅ **Node.js/Express API**: RESTful endpoints with TypeScript
+- ✅ **Authentication System**: JWT-based auth with role management (ADMIN/MEMBER)
+- ✅ **User Management**: Full CRUD operations for users and household linking
+- ✅ **Data Validation**: Zod schema validation throughout
+- ✅ **Security**: Helmet, CORS, rate limiting, password hashing
+
+#### Core Data Management
+
+- ✅ **Household Management**: 14 households with equal shares (andelstal removed)
+- ✅ **Utility Services**: Configurable services (Water, Electricity, Gas, etc.)
+- ✅ **Meter Management**: Both household meters and main meters
+- ✅ **Meter Readings**: Full CRUD with consumption calculations
+- ✅ **Billing Periods**: Quarterly and monthly period support
+- ✅ **Role-based Data Access**: Members only see their own data
+
+#### Frontend Application
+
+- ✅ **React/TypeScript/Vite**: Modern frontend stack
+- ✅ **Material-UI**: Professional UI components and theming
+- ✅ **Authentication Flow**: Login/logout with role-based routing
+- ✅ **Dashboard**: Overview with key metrics
+- ✅ **Utility Services Management**: Full CRUD for services (ADMIN)
+- ✅ **Household Management**: CRUD operations for households (ADMIN)
+- ✅ **Household-Service Connections**: Link services to households
+- ✅ **Meter Readings Management**:
+  - **ADMIN**: Full access to all households and main meters
+  - **MEMBER**: Simplified view - only their own household meters
+- ✅ **User Management**: Admin interface for user/household linking
+
+#### User Experience
+
+- ✅ **Role-based UI**: Different interfaces for ADMIN vs MEMBER users
+- ✅ **Simplified Member Experience**: Members see "Mina mätaravläsningar"
+- ✅ **Responsive Design**: Works on desktop and mobile
+- ✅ **Error Handling**: Comprehensive error handling and user feedback
+
+### 🏗️ CURRENT ARCHITECTURE
+
+#### Technology Stack
+
+- **Frontend**: React 18 + TypeScript + Vite + Material-UI
+- **Backend**: Node.js + Express + TypeScript + Prisma
+- **Database**: PostgreSQL (containerized)
+- **Authentication**: JWT with refresh tokens
+- **Development**: VS Code workspace with tasks and debugging
+
+#### Database Schema (PostgreSQL)
+
+- **Users**: Authentication and role management
+- **Households**: 14 households with owner information
+- **UtilityServices**: Configurable services (Water, Electricity, etc.)
+- **HouseholdMeters**: Individual meters per household per service
+- **MainMeters**: Main meters for reconciliation
+- **MeterReadings**: Both household and main meter readings
+- **BillingPeriods**: Quarterly and monthly billing cycles
+
+#### API Endpoints
+
+- ✅ `/api/auth/*` - Authentication (login/logout)
+- ✅ `/api/users/*` - User management (ADMIN only)
+- ✅ `/api/households/*` - Household management
+- ✅ `/api/utility-services/*` - Service configuration
+- ✅ `/api/household-meters/*` - Household meter management
+- ✅ `/api/main-meters/*` - Main meter management
+- ✅ `/api/meter-readings/*` - Reading management with role restrictions
+- ✅ `/api/billing/*` - Billing periods
+
+### 🎯 TODO LIST - FUTURE DEVELOPMENT
+
+#### High Priority (Next Sprint)
+
+##### 1. 🔍 **Complete System Testing**
+
+- [ ] End-to-end testing of MEMBER user flow
+- [ ] Complete ADMIN functionality testing
+- [ ] Test all API endpoints with authentication
+- [ ] Verify role-based restrictions work correctly
+- [ ] Test meter reading reconciliation logic
+
+##### 2. 📊 **Billing & Invoice Generation**
+
+- [ ] Implement utility billing calculations
+- [ ] Generate quarterly bills (member fees + utilities + shared costs)
+- [ ] Generate optional monthly bills (utilities only)
+- [ ] PDF invoice generation
+- [ ] Bill payment tracking
+- [ ] Outstanding balance management
+
+##### 3. 📈 **Reports & Analytics Dashboard**
+
+- [ ] Consumption reports per household
+- [ ] Cost analysis and trends
+- [ ] Reconciliation reports (main vs household meters)
+- [ ] Financial statements
+- [ ] Export functionality (PDF/Excel)
+- [ ] Visual charts with Chart.js/Recharts
+
+#### Medium Priority
+
+##### 4. 💰 **Advanced Financial Management**
+
+- [ ] Shared costs management and allocation
+- [ ] Budget planning and tracking
+- [ ] Reserve fund calculations
+- [ ] Payment method integration (Bankgiro/Plusgiro)
+- [ ] Automatic reconciliation algorithms
+- [ ] Multi-currency support (if needed)
+
+##### 5. 🏠 **Enhanced Member Features**
+
+- [ ] Member self-service portal improvements
+- [ ] Consumption history and trends
+- [ ] Usage alerts and notifications
+- [ ] Mobile app optimization
+- [ ] Offline reading capability
+- [ ] Member communication system
+
+##### 6. 🔧 **System Administration**
+
+- [ ] Advanced user role management
+- [ ] System configuration interface
+- [ ] Data backup and restore
+- [ ] Audit logging
+- [ ] Performance monitoring
+- [ ] Automated testing suite
+
+#### Low Priority (Future Enhancements)
+
+##### 7. 📱 **Mobile & UX Improvements**
+
+- [ ] Progressive Web App (PWA) features
+- [ ] Push notifications for reading reminders
+- [ ] QR code meter reading
+- [ ] Voice input for readings
+- [ ] Dark mode theme
+- [ ] Accessibility improvements (WCAG compliance)
+
+##### 8. 🔌 **Integrations & Automation**
+
+- [ ] Smart meter integration (automatic readings)
+- [ ] Accounting software integration (Fortnox/Visma)
+- [ ] Email/SMS notifications
+- [ ] Bank payment file generation
+- [ ] Government reporting integration
+- [ ] Weather data for consumption correlation
+
+##### 9. 📊 **Advanced Analytics & AI**
+
+- [ ] Predictive consumption modeling
+- [ ] Leak detection algorithms
+- [ ] Cost optimization recommendations
+- [ ] Seasonal usage analysis
+- [ ] Comparative benchmarking
+- [ ] Machine learning for fraud detection
+
+### 🛠️ TECHNICAL DEBT & IMPROVEMENTS
+
+- [ ] Add comprehensive unit tests
+- [ ] Implement integration tests
+- [ ] Performance optimization
+- [ ] Code documentation improvements
+- [ ] Error monitoring (Sentry integration)
+- [ ] Logging improvements
+- [ ] Security audit and penetration testing
+
+---
+
+## 📋 ORIGINAL ANALYSIS & SPECIFICATIONS
+
 - Monthly fee calculations ("avgift" = fees in Swedish)
 - Cost allocation across different categories
 - Budget vs actual tracking
 - Running balances and totals
 
 #### 2. Member/House Management
+
 - Individual house/housing unit tracking
 - Member-specific fee calculations
 - Different fee structures per house type
 - Payment tracking per member
 
 #### 3. Cost Categories (Multi-Utility Samfällighetsförening)
+
 - **Utility consumption billing** ("konsumtion") - Individual metered usage (water, electricity, gas)
 - **Shared costs** ("gemensamma kostnader") - Split equally between 14 households
 - **Member fees** ("medlemsavgift") - 3000 SEK/year per household
@@ -39,6 +223,7 @@ Based on the Excel structure, the document contains multiple worksheets:
 ## Technical Requirements for Web App
 
 ### Frontend Technology Stack
+
 - **Framework:** React 18+ with TypeScript
 - **Build Tool:** Vite
 - **UI Library:** Material-UI v6 (latest stable, not v8 as requested - v8 doesn't exist)
@@ -49,12 +234,14 @@ Based on the Excel structure, the document contains multiple worksheets:
 ### Core Features to Implement
 
 #### 1. Dashboard
+
 - Overview of total fees collected
 - Monthly financial summary
 - Key performance indicators
 - Visual charts showing financial trends
 
 #### 2. Member Management
+
 ```typescript
 interface UtilityService {
   id: string;
@@ -73,17 +260,18 @@ interface Member {
   ownerName: string;
   andelstal: number; // 1/14 = 0.0714285714 for equal shares
   annualMemberFee: number; // 3000 SEK
-  paymentStatus: 'paid' | 'pending' | 'overdue';
+  paymentStatus: "paid" | "pending" | "overdue";
   balanceAccount: number;
 }
 ```
 
 #### 3. Fee Calculation System
+
 ```typescript
 interface BillingPeriod {
   id: string;
   periodName: string; // e.g., "2025-Q1", "2025-01", "2025-02"
-  periodType: 'quarterly' | 'monthly';
+  periodType: "quarterly" | "monthly";
   startDate: Date;
   endDate: Date;
   isOfficialBilling: boolean; // true only for 3 main quarterly periods
@@ -100,18 +288,18 @@ interface UtilityBilling {
   serviceId: string; // references UtilityService
   billingPeriodId: string; // references BillingPeriod
   reconciliationId?: string; // optional, for services that require reconciliation
-  
+
   // Consumption details
   rawConsumption: number; // household meter reading difference
   reconciliationAdjustment: number; // ± adjustment from reconciliation (0 if no reconciliation)
   adjustedConsumption: number; // raw consumption + adjustment
-  
+
   // Billing breakdown
   costPerUnit: number; // SEK per unit (m³, kWh, etc.)
   consumptionCost: number; // adjusted consumption × cost per unit
   fixedFeeShare: number; // fixed fee ÷ 14 households
   totalUtilityCost: number; // consumption cost + fixed fee share
-  
+
   created_at: Date;
 }
 
@@ -124,7 +312,7 @@ interface QuarterlyBill {
   sharedCosts: number; // total shared costs ÷ 14 households
   totalAmount: number;
   dueDate: Date;
-  status: 'pending' | 'paid' | 'overdue';
+  status: "pending" | "paid" | "overdue";
 }
 
 interface MonthlyBill {
@@ -134,7 +322,7 @@ interface MonthlyBill {
   utilityCharges: UtilityBilling[]; // array of utility services for this month
   totalAmount: number; // utility costs only (no member fees or shared costs)
   dueDate: Date;
-  status: 'pending' | 'paid' | 'overdue';
+  status: "pending" | "paid" | "overdue";
 }
 
 interface MeterReading {
@@ -149,12 +337,14 @@ interface MeterReading {
 ```
 
 #### 4. Financial Reporting
+
 - Monthly financial statements
 - Annual budget planning
 - Cost center analysis
 - Export functionality (PDF, Excel)
 
 #### 5. Budget Management
+
 ```typescript
 interface Budget {
   year: number;
@@ -174,6 +364,7 @@ interface Budget {
 ### Data Model Structure
 
 #### Core Entities
+
 1. **Property Owners** - Individual property owners within the association
 2. **Properties** - Individual properties with shares and metadata
 3. **Transactions** - All financial movements
@@ -184,6 +375,7 @@ interface Budget {
 ### UI Components to Build
 
 #### Navigation Structure
+
 ```
 Dashboard
 ├── Multi-Utility Billing Overview
@@ -215,6 +407,7 @@ Dashboard
 ```
 
 #### Key Material-UI Components to Use
+
 - `DataGrid` for member and transaction lists
 - `Card` components for dashboard metrics
 - `TextField` and `Select` for forms
@@ -226,6 +419,7 @@ Dashboard
 ### Architecture Decisions Made
 
 1. **Data Source:** ✅ **DECIDED**
+
    - **Database:** PostgreSQL for robust data persistence
    - **API Backend:** Node.js + Express
    - **Data Migration:** Import existing Excel data into PostgreSQL
@@ -239,7 +433,9 @@ Dashboard
 Given your PostgreSQL choice, here are the best backend options:
 
 #### Option 1: Node.js + Express (Recommended for this project)
+
 **Pros:**
+
 - Same language (TypeScript) for both frontend and backend
 - Excellent PostgreSQL support with Prisma ORM
 - Fast development cycle
@@ -247,6 +443,7 @@ Given your PostgreSQL choice, here are the best backend options:
 - Easy integration with React frontend
 
 **Tech Stack:**
+
 - **Runtime:** Node.js 18+
 - **Framework:** Express.js with TypeScript
 - **ORM:** Prisma (excellent PostgreSQL integration)
@@ -265,64 +462,100 @@ Database (PostgreSQL)
 ```
 
 1. **Calculation Logic:** Are there specific Swedish samfällighetsförening regulations that affect:
+
    - Fee calculation formulas based on andelstal (share ratios)?
    - Reserve fund requirements?
    - VAT handling for different services?
 
 2. **Integration Needs:** Should the app integrate with:
+
    - Swedish banking systems (Bankgiro/Plusgiro)?
    - Accounting software (Fortnox, Visma)?
    - Government reporting systems?
 
-3. **Localization:** 
+3. **Localization:**
+
    - Should the UI be in Swedish only?
    - Date formats (Swedish standard)?
    - Currency formatting (SEK)?
 
-4. **Data Migration:** 
+4. **Data Migration:**
    - How should existing Excel data be imported?
    - Is historical data preservation critical?
    - What's the migration timeline?
 
-## Implementation Phases
+## ✅ COMPLETED IMPLEMENTATION PHASES
 
-### Phase 1: Full Stack Setup
-- Set up React/TypeScript/Vite frontend project
-- Set up Node.js/Express/TypeScript backend project
-- Configure PostgreSQL database with Prisma ORM
-- Implement basic authentication system
-- Create basic routing and layout
-- Design Material-UI theme (Swedish design preferences)
+### Phase 1: Full Stack Setup ✅ COMPLETED
 
-### Phase 2: Core Features
-- Build property owner management (CRUD operations)
-- Implement property/unit management with andelstal
-- Create basic dashboard with key metrics
-- Set up database schema for financial data
+- ✅ Set up React/TypeScript/Vite frontend project
+- ✅ Set up Node.js/Express/TypeScript backend project
+- ✅ Configure PostgreSQL database with Prisma ORM
+- ✅ Implement basic authentication system (JWT + roles)
+- ✅ Create basic routing and layout
+- ✅ Design Material-UI theme (Swedish design preferences)
 
-### Phase 3: Financial Features
-- Implement fee calculation logic
-- Build payment tracking functionality
-- Create financial reporting system
-- Add budget planning features
+### Phase 2: Core Features ✅ COMPLETED
+
+- ✅ Build user management (CRUD operations with role-based access)
+- ✅ Implement household management (14 households, removed andelstal)
+- ✅ Create dashboard with key metrics
+- ✅ Set up complete database schema for utility management
+- ✅ Utility services management (Water, Electricity, Gas, etc.)
+- ✅ Meter management (household + main meters)
+- ✅ Meter readings with role-based restrictions
+- ✅ Billing periods (quarterly + monthly support)
+
+## 🚧 REMAINING IMPLEMENTATION PHASES
+
+### Phase 3: Financial Features (NEXT PRIORITY)
+
+- [ ] Implement complete billing calculation logic
+- [ ] Build automatic bill generation (quarterly + monthly)
+- [ ] Create reconciliation algorithms (main vs household meters)
+- [ ] Add payment tracking functionality
+- [ ] Implement shared costs allocation
+- [ ] Build financial reporting system
+- [ ] Add budget planning features
+- [ ] PDF invoice generation
 
 ### Phase 4: Advanced Features
-- Data visualization and charts
-- Excel import/export functionality
-- Advanced reporting and analytics
-- User role management and permissions
 
-### Phase 4: Polish & Production
-- Data validation and error handling
-- Performance optimization
-- User testing and feedback integration
-- Deployment preparation
+- [ ] Data visualization and charts (consumption trends, cost analysis)
+- [ ] Excel import/export functionality
+- [ ] Advanced reporting and analytics
+- [ ] Enhanced user role management and permissions
+- [ ] Mobile optimization and PWA features
+- [ ] Automated notifications and reminders
 
-## Database Schema Design (PostgreSQL)
+### Phase 5: Polish & Production
 
-#### Core Tables
+- [ ] Comprehensive data validation and error handling
+- [ ] Performance optimization and caching
+- [ ] User testing and feedback integration
+- [ ] Production deployment preparation
+- [ ] Security audit and testing
+- [ ] Documentation and training materials
+
+## 🗄️ CURRENT DATABASE SCHEMA (PostgreSQL + Prisma)
+
+#### Core Tables (Implemented)
+
 ```sql
--- Households table
+-- Users table (authentication)
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role ENUM('ADMIN', 'MEMBER') DEFAULT 'MEMBER',
+  household_id UUID REFERENCES households(id), -- nullable for admin users
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Households table (14 households)
 CREATE TABLE households (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_number INTEGER UNIQUE NOT NULL CHECK (household_number BETWEEN 1 AND 14),
@@ -330,8 +563,6 @@ CREATE TABLE households (
   email VARCHAR(255) UNIQUE,
   phone VARCHAR(20),
   address VARCHAR(255),
-  andelstal DECIMAL(10,8) DEFAULT 0.07142857, -- 1/14 = 0.07142857
-  annual_member_fee DECIMAL(8,2) DEFAULT 3000.00,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -343,14 +574,10 @@ CREATE TABLE utility_services (
   name VARCHAR(100) NOT NULL, -- "Water", "Electricity", "Gas"
   unit VARCHAR(20) NOT NULL, -- "m³", "kWh", "m³"
   is_active BOOLEAN DEFAULT true,
-  has_main_meters BOOLEAN DEFAULT false, -- true for services with reconciliation
-  main_meter_count INTEGER DEFAULT 0, -- number of main meters
-  reading_frequency INTEGER DEFAULT 3, -- readings per year
-  requires_reconciliation BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Main meters table (generic for all services)
+-- Main meters table (for reconciliation)
 CREATE TABLE main_meters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_id UUID REFERENCES utility_services(id),
@@ -431,12 +658,12 @@ CREATE TABLE utility_billing (
   service_id UUID REFERENCES utility_services(id),
   reconciliation_id UUID REFERENCES utility_reconciliation(id), -- nullable for services without reconciliation
   billing_period_id UUID REFERENCES billing_periods(id),
-  
+
   -- Consumption breakdown
   raw_consumption DECIMAL(12,3) NOT NULL, -- household meter reading difference
   reconciliation_adjustment DECIMAL(10,3) DEFAULT 0, -- ± adjustment from reconciliation
   adjusted_consumption DECIMAL(12,3) NOT NULL, -- raw + adjustment
-  
+
   -- Pricing breakdown
   cost_per_unit DECIMAL(8,4) NOT NULL, -- variable rate
   consumption_cost DECIMAL(10,2) NOT NULL, -- adjusted consumption × rate
@@ -458,7 +685,7 @@ CREATE TABLE billing_periods (
   reading_deadline DATE NOT NULL, -- when meter readings are due
   billing_deadline DATE, -- when bills must be generated (nullable for monitoring-only periods)
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
+
   UNIQUE(period_name, period_type)
 );
 
@@ -467,20 +694,20 @@ CREATE TABLE quarterly_bills (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID REFERENCES households(id),
   billing_period_id UUID REFERENCES billing_periods(id),
-  
+
   member_fee DECIMAL(8,2) DEFAULT 1000.00, -- 3000/3 = 1000 SEK per period
   total_utility_costs DECIMAL(10,2) NOT NULL, -- sum of all utility services
   shared_costs DECIMAL(8,2) NOT NULL, -- total shared costs ÷ 14
   total_amount DECIMAL(10,2) NOT NULL,
-  
+
   due_date DATE NOT NULL,
   status ENUM('pending', 'paid', 'overdue') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
+
   -- Ensure only official billing periods can have quarterly bills
   CONSTRAINT quarterly_bills_official_only CHECK (
     EXISTS (
-      SELECT 1 FROM billing_periods bp 
+      SELECT 1 FROM billing_periods bp
       WHERE bp.id = billing_period_id AND bp.is_official_billing = true
     )
   )
@@ -491,20 +718,20 @@ CREATE TABLE monthly_bills (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID REFERENCES households(id),
   billing_period_id UUID REFERENCES billing_periods(id),
-  
+
   total_utility_costs DECIMAL(10,2) NOT NULL, -- sum of all utility services for this month
   total_amount DECIMAL(10,2) NOT NULL, -- same as utility costs (no member fees or shared costs)
-  
+
   due_date DATE NOT NULL,
   status ENUM('pending', 'paid', 'overdue') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
+
   -- Ensure only monthly periods with billing enabled can have monthly bills
   CONSTRAINT monthly_bills_billing_enabled_only CHECK (
     EXISTS (
-      SELECT 1 FROM billing_periods bp 
-      WHERE bp.id = billing_period_id 
-      AND bp.period_type = 'monthly' 
+      SELECT 1 FROM billing_periods bp
+      WHERE bp.id = billing_period_id
+      AND bp.period_type = 'monthly'
       AND bp.is_billing_enabled = true
     )
   )
@@ -520,7 +747,7 @@ CREATE TABLE payments (
   payment_method VARCHAR(50),
   reference_number VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
+
   -- Ensure payment is for either quarterly or monthly bill, but not both
   CONSTRAINT payment_bill_type_check CHECK (
     (quarterly_bill_id IS NOT NULL AND monthly_bill_id IS NULL) OR
@@ -553,24 +780,28 @@ CREATE TABLE water_pricing (
 ### Multi-Utility Service Examples
 
 #### 1. Water Service
+
 - **Main meters:** 2 (requires reconciliation)
 - **Unit:** m³ (cubic meters)
 - **Reading frequency:** 3 times per year
 - **Reconciliation:** Yes - accounts for leaks and shared usage
 
-#### 2. Electricity Service  
+#### 2. Electricity Service
+
 - **Main meters:** 1 (requires reconciliation)
 - **Unit:** kWh (kilowatt-hours)
 - **Reading frequency:** 4 times per year (quarterly)
 - **Reconciliation:** Yes - accounts for common area lighting, pumps
 
 #### 3. Gas Service
+
 - **Main meters:** 1 (requires reconciliation)
 - **Unit:** m³ (cubic meters)
 - **Reading frequency:** 2 times per year (bi-annual)
 - **Reconciliation:** Yes - accounts for common heating systems
 
 #### 4. Waste Management Service
+
 - **Main meters:** 0 (no reconciliation needed)
 - **Unit:** Fixed fee per household
 - **Reading frequency:** 1 time per year
@@ -579,18 +810,21 @@ CREATE TABLE water_pricing (
 ### Utility Pricing Structure Examples
 
 #### Water Service with Fixed Fee
+
 - **Variable rate:** 45.50 SEK per m³
 - **Fixed subscription fee:** 2,400 SEK per quarter (total for all households)
 - **Fixed fee per household:** 2,400 ÷ 14 = 171.43 SEK per household per quarter
 - **Example bill:** (5.2 m³ × 45.50 SEK) + 171.43 SEK = 236.60 + 171.43 = 408.03 SEK
 
 #### Electricity Service with Connection Fee
+
 - **Variable rate:** 1.85 SEK per kWh
 - **Grid connection fee:** 840 SEK per quarter (total)
 - **Fixed fee per household:** 840 ÷ 14 = 60.00 SEK per household per quarter
 - **Example bill:** (450 kWh × 1.85 SEK) + 60.00 SEK = 832.50 + 60.00 = 892.50 SEK
 
 #### Gas Service with Base Fee
+
 - **Variable rate:** 12.30 SEK per m³
 - **Base service fee:** 1,680 SEK per quarter (total)
 - **Fixed fee per household:** 1,680 ÷ 14 = 120.00 SEK per household per quarter
@@ -606,12 +840,14 @@ CREATE TABLE water_pricing (
 ### Gröngräset Samfällighetsförening - Specific Setup
 
 **Key Details:**
+
 - **14 households** with equal shares (andelstal = 1/14 = 0.07142857)
 - **Annual member fee:** 3,000 SEK per household
 - **Payment schedule:** 3 payments per year (1,000 SEK per payment)
 - **Primary purpose:** Water consumption billing + shared cost management
 
 **Multi-Utility Billing System with Configurable Services:**
+
 - **Configurable utility services** (Water, Electricity, Gas, etc.)
 - **Flexible meter configurations** (with or without main meters)
 - **Service-specific reconciliation** (when main meters exist)
@@ -620,6 +856,7 @@ CREATE TABLE water_pricing (
 - **Unified billing** combining all services + member fees + shared costs
 
 **Billing Formula per Quarter - Multi-Utility with Fixed Fees:**
+
 ```
 For each utility service:
 1. If service has main meters: Apply reconciliation
@@ -645,17 +882,20 @@ Where:
 ```
 
 **Cost Structure:**
+
 1. **Fixed Member Fee:** 1,000 SEK per household per payment period
 2. **Variable Water Cost:** Based on adjusted consumption (reconciled m³ × rate)
 3. **Shared Costs:** Utilities, maintenance, admin costs split equally
 4. **Reconciliation Factor:** Accounts for meter differences and shared usage
 
 **Payment Frequency:**
+
 - Currently 3 times per year (can be adjusted in the web app)
 - Corresponds with water meter reading schedule
 - Quarterly billing cycle
 
 ## Next Steps
+
 1. Clarify the questions above
 2. Examine actual Excel formulas and data relationships
 3. Define exact calculation logic for Swedish housing cooperative fees
@@ -667,6 +907,7 @@ Would you like me to dive deeper into any specific aspect or answer the clarific
 ## Reading Frequency and Billing Periods
 
 ### Overview
+
 The system supports flexible reading and billing periods to accommodate both mandatory official billing and optional monthly billing/monitoring:
 
 1. **Official Quarterly Periods:** 3 mandatory reading periods per year (every 4th month)
@@ -676,6 +917,7 @@ The system supports flexible reading and billing periods to accommodate both man
 ### Billing Period Types
 
 #### 1. Official Quarterly Periods (Mandatory)
+
 - **Frequency:** 3 times per year (January, May, September)
 - **Purpose:** Official billing and invoicing
 - **Reconciliation:** Full meter reconciliation performed
@@ -684,6 +926,7 @@ The system supports flexible reading and billing periods to accommodate both man
 - **Examples:** 2025-Q1 (Jan-Apr), 2025-Q2 (May-Aug), 2025-Q3 (Sep-Dec)
 
 #### 2. Optional Monthly Periods (Voluntary)
+
 - **Frequency:** Up to 9 additional months (Feb, Mar, Apr, Jun, Jul, Aug, Oct, Nov, Dec)
 - **Purpose:** Either billing or monitoring (configurable per period)
 - **Options:**
@@ -695,6 +938,7 @@ The system supports flexible reading and billing periods to accommodate both man
 ### Reconciliation Process
 
 #### For Official Quarterly Periods:
+
 1. **Main Meter Readings:** Total consumption from supplier
 2. **Household Meter Readings:** Sum of all individual household meters
 3. **Calculate Difference:** Main meters - Household meters = Distribution losses/gains
@@ -703,6 +947,7 @@ The system supports flexible reading and billing periods to accommodate both man
 6. **Generate Bills:** Full quarterly bills with member fees and shared costs
 
 #### For Monthly Periods with Billing Enabled:
+
 1. **Main Meter Readings:** Optional - can be enabled for reconciliation
 2. **Household Meter Readings:** Required for all households
 3. **Reconciliation Options:**
@@ -711,6 +956,7 @@ The system supports flexible reading and billing periods to accommodate both man
 4. **Generate Bills:** Monthly utility bills only (no member fees or shared costs)
 
 #### For Monthly Periods (Monitoring Only):
+
 1. **Household Readings Only:** Raw meter readings for monitoring
 2. **No Reconciliation:** Use readings as-is for informational purposes
 3. **No Billing:** Data used for trend analysis and leak detection only
@@ -718,6 +964,7 @@ The system supports flexible reading and billing periods to accommodate both man
 ### Consumption Calculation Examples
 
 #### Example 1: Official Quarterly Period (2025-Q1) - Water Service
+
 ```
 Main Meter Total: 1,000 m³
 Household Meters Total: 980 m³
@@ -734,6 +981,7 @@ Household A:
 ```
 
 #### Example 2: Optional Monthly Period with Billing (2025-02) - Water Service
+
 ```
 Main Meter Reading: Optional (370 m³ if reconciliation enabled)
 Household Meters Total: 350 m³ (if reconciliation enabled)
@@ -751,6 +999,7 @@ Household A:
 ```
 
 #### Example 3: Optional Monthly Period (Monitoring Only) (2025-03) - Water Service
+
 ```
 No Main Meter Reading Required
 Household A: 4.8 m³ (raw reading for monitoring only)
@@ -782,33 +1031,121 @@ INSERT INTO billing_periods VALUES
 ### Business Logic
 
 #### Reading Collection:
+
 1. **Official Quarterly Periods:** Both main and household meters must be read
 2. **Monthly Billing Periods:** Household meters required, main meters optional (based on reconciliation setting)
 3. **Monthly Monitoring Periods:** Only household meters need to be read
 4. **Missing Readings:** System can estimate based on historical consumption
 
 #### Billing Generation:
+
 1. **Official Quarterly Periods:** Generate comprehensive quarterly bills (member fees + utilities + shared costs)
 2. **Monthly Billing Periods:** Generate utility-only bills (no member fees or shared costs)
 3. **Monthly Monitoring Periods:** No bills generated, data used for reporting only
 4. **Reconciliation:** Performed based on period settings (always for quarterly, optional for monthly billing)
 
 #### Payment Processing:
+
 1. **Quarterly Bills:** Include all costs, due within 30 days
 2. **Monthly Bills:** Utility costs only, due within 15 days
 3. **Outstanding Balances:** Track separately for quarterly vs monthly bills
 4. **Credit/Debit Adjustments:** Applied during next quarterly billing period
 
 #### User Experience:
+
 1. **Dashboard:** Shows both official and optional readings with billing status
 2. **Notifications:** Reminders for reading deadlines and bill due dates
 3. **Reports:** Monthly consumption trends and cost analysis
 4. **Bill Preview:** Estimate bills using latest readings
 5. **Flexible Configuration:** Admin can enable/disable monthly billing per period
-4. **Bill Preview:** Estimate bills using latest readings
+6. **Bill Preview:** Estimate bills using latest readings
 
 This approach gives you the best of both worlds:
+
 - **Simplified Billing:** Only 3 official bills per year
 - **Enhanced Monitoring:** Optional monthly readings for leak detection and usage tracking
 - **Accurate Reconciliation:** Proper meter reconciliation during official periods
 - **Flexible System:** Easy to add or remove optional reading periods as needed
+
+## 🚀 DEVELOPMENT ENVIRONMENT
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- Docker & Docker Compose
+- VS Code (recommended)
+
+### Quick Start
+
+```bash
+# 1. Start database
+docker compose up -d
+
+# 2. Setup backend
+cd backend
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+
+# 3. Setup frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+
+# 4. Access application
+# Frontend: http://localhost:5174
+# Backend API: http://localhost:3001
+```
+
+### VS Code Tasks
+
+- **dev-backend**: Start backend development server
+- **dev-frontend**: Start frontend development server
+- **build-backend**: Build backend for production
+- **test-backend**: Run backend tests
+- **prisma-generate**: Generate Prisma client
+- **prisma-migrate**: Run database migrations
+- **docker-up**: Start PostgreSQL database
+- **docker-down**: Stop database
+
+### Test Accounts
+
+```
+Admin Account:
+Email: admin@grongrasset.se
+Password: admin123
+
+Member Account:
+Email: member@grongrasset.se
+Password: member123
+```
+
+### Key URLs
+
+- **Frontend**: http://localhost:5174
+- **Backend API**: http://localhost:3001
+- **Database**: localhost:5432
+- **Health Check**: http://localhost:3001/health
+
+### Database Schema
+
+Current Prisma schema includes:
+
+- Users (authentication & roles)
+- Households (14 households)
+- UtilityServices (Water, Electricity, etc.)
+- HouseholdMeters & MainMeters
+- MeterReadings (household & main)
+- BillingPeriods (quarterly & monthly)
+
+### API Documentation
+
+All endpoints require authentication except `/api/auth/login`
+
+- **Authentication**: Bearer token in Authorization header
+- **ADMIN Endpoints**: Full access to all data
+- **MEMBER Endpoints**: Restricted to own household data
+
+---
