@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma';
-import { z } from 'zod';
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { z } from "zod";
 
 const router = Router();
 
@@ -9,15 +9,18 @@ const utilityServiceSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
   unit: z.string().min(1).max(20),
-  unitPrice: z.number().min(0).default(0),
-  serviceType: z.enum(['WATER', 'ELECTRICITY', 'HEATING', 'INTERNET', 'OTHER']).default('OTHER'),
+  serviceType: z
+    .enum(["WATER", "ELECTRICITY", "HEATING", "INTERNET", "OTHER"])
+    .default("OTHER"),
   isActive: z.boolean().default(true),
   isMandatory: z.boolean().default(false),
-  billingFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY']).default('QUARTERLY'),
+  billingFrequency: z
+    .enum(["MONTHLY", "QUARTERLY", "ANNUALLY"])
+    .default("QUARTERLY"),
 });
 
 // GET /api/utility-services
-router.get('/', async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const services = await prisma.utilityService.findMany({
       where: { isActive: true },
@@ -30,7 +33,7 @@ router.get('/', async (req, res, next) => {
         },
         pricing: {
           where: { isActive: true },
-          orderBy: { effectiveDate: 'desc' },
+          orderBy: { effectiveDate: "desc" },
           take: 1,
         },
       },
@@ -47,10 +50,10 @@ router.get('/', async (req, res, next) => {
 });
 
 // GET /api/utility-services/:id
-router.get('/:id', async (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const service = await prisma.utilityService.findUnique({
       where: { id },
       include: {
@@ -67,7 +70,7 @@ router.get('/:id', async (req, res, next) => {
           },
         },
         pricing: {
-          orderBy: { effectiveDate: 'desc' },
+          orderBy: { effectiveDate: "desc" },
         },
       },
     });
@@ -75,7 +78,7 @@ router.get('/:id', async (req, res, next) => {
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Utility service not found',
+        message: "Utility service not found",
       });
     }
 
@@ -90,20 +93,12 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/utility-services
-router.post('/', async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
-    console.log('POST request body:', JSON.stringify(req.body, null, 2));
-    
-    // Preprocess the data to handle type conversions
-    const preprocessedData = {
-      ...req.body,
-      unitPrice: req.body.unitPrice !== undefined && req.body.unitPrice !== null && !isNaN(Number(req.body.unitPrice)) 
-        ? Number(req.body.unitPrice) 
-        : 0,
-    };
-    
-    const validatedData = utilityServiceSchema.parse(preprocessedData);
-    console.log('Validated data:', JSON.stringify(validatedData, null, 2));
+    console.log("POST request body:", JSON.stringify(req.body, null, 2));
+
+    const validatedData = utilityServiceSchema.parse(req.body);
+    console.log("Validated data:", JSON.stringify(validatedData, null, 2));
 
     const service = await prisma.utilityService.create({
       data: validatedData,
@@ -115,15 +110,15 @@ router.post('/', async (req, res, next) => {
     });
     return;
   } catch (error) {
-    console.error('POST /api/utility-services error:', error);
+    console.error("POST /api/utility-services error:", error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        message: 'Validation error',
+        message: "Validation error",
         errors: error.errors.reduce((acc, err) => {
-          acc[err.path.join('.')] = err.message;
+          acc[err.path.join(".")] = err.message;
           return acc;
-        }, {} as Record<string, string>)
+        }, {} as Record<string, string>),
       });
     }
     next(error);
@@ -132,21 +127,13 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/utility-services/:id
-router.put('/:id', async (req, res, next) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    console.log('PUT request body:', JSON.stringify(req.body, null, 2));
-    
-    // Preprocess the data to handle type conversions
-    const preprocessedData = {
-      ...req.body,
-      unitPrice: req.body.unitPrice !== undefined && req.body.unitPrice !== null && !isNaN(Number(req.body.unitPrice)) 
-        ? Number(req.body.unitPrice) 
-        : undefined, // Keep as undefined for updates if not provided
-    };
-    
-    const validatedData = utilityServiceSchema.partial().parse(preprocessedData);
-    console.log('Validated data:', JSON.stringify(validatedData, null, 2));
+    console.log("PUT request body:", JSON.stringify(req.body, null, 2));
+
+    const validatedData = utilityServiceSchema.partial().parse(req.body);
+    console.log("Validated data:", JSON.stringify(validatedData, null, 2));
 
     const service = await prisma.utilityService.update({
       where: { id },
@@ -159,15 +146,15 @@ router.put('/:id', async (req, res, next) => {
     });
     return;
   } catch (error) {
-    console.error('PUT /api/utility-services/:id error:', error);
+    console.error("PUT /api/utility-services/:id error:", error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        message: 'Validation error',
+        message: "Validation error",
         errors: error.errors.reduce((acc, err) => {
-          acc[err.path.join('.')] = err.message;
+          acc[err.path.join(".")] = err.message;
           return acc;
-        }, {} as Record<string, string>)
+        }, {} as Record<string, string>),
       });
     }
     next(error);
@@ -176,7 +163,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/utility-services/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -197,14 +184,15 @@ router.delete('/:id', async (req, res, next) => {
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Utility service not found',
+        message: "Utility service not found",
       });
     }
 
     // Check if service has related data
-    const hasRelatedData = service._count.mainMeters > 0 || 
-                          service._count.householdMeters > 0 || 
-                          service._count.utilityBilling > 0;
+    const hasRelatedData =
+      service._count.mainMeters > 0 ||
+      service._count.householdMeters > 0 ||
+      service._count.utilityBilling > 0;
 
     if (hasRelatedData) {
       // Soft delete by setting isActive to false when service is in use
@@ -215,15 +203,16 @@ router.delete('/:id', async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: 'Utility service deactivated because it has related data (meters or billing records)',
+        message:
+          "Utility service deactivated because it has related data (meters or billing records)",
         data: {
-          action: 'soft_delete',
+          action: "soft_delete",
           relatedData: {
             mainMeters: service._count.mainMeters,
             householdMeters: service._count.householdMeters,
-            billingRecords: service._count.utilityBilling
-          }
-        }
+            billingRecords: service._count.utilityBilling,
+          },
+        },
       });
     } else {
       // Hard delete if no related data - service can be safely removed
@@ -233,11 +222,11 @@ router.delete('/:id', async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: 'Utility service permanently deleted',
+        message: "Utility service permanently deleted",
         data: {
-          action: 'hard_delete',
-          deletedServiceId: id
-        }
+          action: "hard_delete",
+          deletedServiceId: id,
+        },
       });
     }
   } catch (error) {

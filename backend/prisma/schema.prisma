@@ -31,7 +31,6 @@ model UtilityService {
   name                   String                  @unique @db.VarChar(100)
   description            String?                 @db.VarChar(500)
   unit                   String                  @db.VarChar(20)
-  unitPrice              Decimal                 @default(0.00) @map("unit_price") @db.Decimal(10, 2)
   serviceType            ServiceType             @default(OTHER) @map("service_type")
   isActive               Boolean                 @default(true) @map("is_active")
   isMandatory            Boolean                 @default(false) @map("is_mandatory")
@@ -307,6 +306,7 @@ enum ServiceType {
   ELECTRICITY
   HEATING
   INTERNET
+  MEMBERSHIP
   OTHER
 }
 

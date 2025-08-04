@@ -1,13 +1,13 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma';
-import { z } from 'zod';
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { z } from "zod";
 
 const router = Router();
 
 // Validation schemas
 const billingPeriodSchema = z.object({
   periodName: z.string().min(1).max(100),
-  periodType: z.enum(['quarterly', 'monthly']),
+  periodType: z.enum(["quarterly", "monthly"]),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   readingDeadline: z.string().datetime(),
@@ -19,14 +19,14 @@ const billingPeriodSchema = z.object({
 const generateBillsSchema = z.object({
   billingPeriodId: z.string().uuid(),
   householdIds: z.array(z.string().uuid()).optional(),
-  billType: z.enum(['quarterly', 'monthly']),
+  billType: z.enum(["quarterly", "monthly"]),
 });
 
 // GET /api/billing/periods - Get all billing periods
-router.get('/periods', async (req, res, next) => {
+router.get("/periods", async (req, res, next) => {
   try {
     const periods = await prisma.billingPeriod.findMany({
-      orderBy: { startDate: 'desc' },
+      orderBy: { startDate: "desc" },
       include: {
         _count: {
           select: {
@@ -50,7 +50,7 @@ router.get('/periods', async (req, res, next) => {
 });
 
 // POST /api/billing/periods - Create billing period
-router.post('/periods', async (req, res, next) => {
+router.post("/periods", async (req, res, next) => {
   try {
     const validatedData = billingPeriodSchema.parse(req.body);
 
@@ -74,7 +74,7 @@ router.post('/periods', async (req, res, next) => {
 });
 
 // GET /api/billing/quarterly - Get quarterly bills
-router.get('/quarterly', async (req, res, next) => {
+router.get("/quarterly", async (req, res, next) => {
   try {
     const { householdId, periodId } = req.query;
 
@@ -102,8 +102,8 @@ router.get('/quarterly', async (req, res, next) => {
         payments: true,
       },
       orderBy: [
-        { billingPeriod: { startDate: 'desc' } },
-        { household: { householdNumber: 'asc' } },
+        { billingPeriod: { startDate: "desc" } },
+        { household: { householdNumber: "asc" } },
       ],
     });
 
@@ -118,7 +118,7 @@ router.get('/quarterly', async (req, res, next) => {
 });
 
 // GET /api/billing/monthly - Get monthly bills
-router.get('/monthly', async (req, res, next) => {
+router.get("/monthly", async (req, res, next) => {
   try {
     const { householdId, periodId } = req.query;
 
@@ -146,8 +146,8 @@ router.get('/monthly', async (req, res, next) => {
         payments: true,
       },
       orderBy: [
-        { billingPeriod: { startDate: 'desc' } },
-        { household: { householdNumber: 'asc' } },
+        { billingPeriod: { startDate: "desc" } },
+        { household: { householdNumber: "asc" } },
       ],
     });
 
@@ -162,9 +162,10 @@ router.get('/monthly', async (req, res, next) => {
 });
 
 // POST /api/billing/generate - Generate bills for a billing period
-router.post('/generate', async (req, res, next) => {
+router.post("/generate", async (req, res, next) => {
   try {
-    const { billingPeriodId, householdIds, billType } = generateBillsSchema.parse(req.body);
+    const { billingPeriodId, householdIds, billType } =
+      generateBillsSchema.parse(req.body);
 
     // Get billing period
     const billingPeriod = await prisma.billingPeriod.findUnique({
@@ -174,7 +175,7 @@ router.post('/generate', async (req, res, next) => {
     if (!billingPeriod) {
       return res.status(404).json({
         success: false,
-        message: 'Billing period not found',
+        message: "Billing period not found",
       });
     }
 
@@ -194,7 +195,7 @@ router.post('/generate', async (req, res, next) => {
                     isActive: true,
                     effectiveDate: { lte: billingPeriod.endDate },
                   },
-                  orderBy: { effectiveDate: 'desc' },
+                  orderBy: { effectiveDate: "desc" },
                   take: 1,
                 },
               },
@@ -207,7 +208,7 @@ router.post('/generate', async (req, res, next) => {
       },
     });
 
-    if (billType === 'quarterly') {
+    if (billType === "quarterly") {
       // Generate quarterly bills with shared costs
       const sharedCosts = await prisma.sharedCost.findMany({
         where: {
@@ -229,18 +230,20 @@ router.post('/generate', async (req, res, next) => {
 
           if (reading && pricing) {
             // Get previous reading for consumption calculation
-            const previousReading = await prisma.householdMeterReading.findFirst({
-              where: {
-                householdMeterId: meter.id,
-                billingPeriod: {
-                  endDate: { lt: billingPeriod.startDate },
+            const previousReading =
+              await prisma.householdMeterReading.findFirst({
+                where: {
+                  householdMeterId: meter.id,
+                  billingPeriod: {
+                    endDate: { lt: billingPeriod.startDate },
+                  },
                 },
-              },
-              orderBy: { billingPeriod: { endDate: 'desc' } },
-            });
+                orderBy: { billingPeriod: { endDate: "desc" } },
+              });
 
-            const consumption = previousReading 
-              ? Number(reading.meterReading) - Number(previousReading.meterReading)
+            const consumption = previousReading
+              ? Number(reading.meterReading) -
+                Number(previousReading.meterReading)
               : Number(reading.meterReading);
 
             const variableCost = consumption * Number(pricing.pricePerUnit);
@@ -255,17 +258,31 @@ router.post('/generate', async (req, res, next) => {
               variableCost,
               fixedCost,
               meterReading: Number(reading.meterReading),
-              previousMeterReading: previousReading ? Number(previousReading.meterReading) : 0,
+              previousMeterReading: previousReading
+                ? Number(previousReading.meterReading)
+                : 0,
             });
           }
         }
 
         // Calculate shared costs
-        const totalSharedCosts = sharedCosts.reduce((sum, cost) => 
-          sum + Number(cost.costPerHousehold), 0
+        const totalSharedCosts = sharedCosts.reduce(
+          (sum, cost) => sum + Number(cost.costPerHousehold),
+          0
         );
 
-        const memberFee = Number(household.annualMemberFee) / 4; // Quarterly portion
+        // Calculate member fee from existing utility billings (MEMBERSHIP service)
+        const memberFeeFromUtility = await prisma.utilityBilling.findFirst({
+          where: {
+            householdId: household.id,
+            billingPeriodId,
+            service: { serviceType: "MEMBERSHIP" },
+          },
+        });
+
+        const memberFee = memberFeeFromUtility
+          ? Number(memberFeeFromUtility.totalUtilityCost)
+          : 0;
         const totalAmount = totalUtilityCosts + totalSharedCosts + memberFee;
 
         const bill = await prisma.quarterlyBill.create({
@@ -277,7 +294,7 @@ router.post('/generate', async (req, res, next) => {
             sharedCosts: totalSharedCosts,
             totalAmount,
             dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-            status: 'pending',
+            status: "pending",
           },
           include: {
             household: true,
@@ -308,18 +325,20 @@ router.post('/generate', async (req, res, next) => {
 
           if (reading && pricing) {
             // Get previous reading for consumption calculation
-            const previousReading = await prisma.householdMeterReading.findFirst({
-              where: {
-                householdMeterId: meter.id,
-                billingPeriod: {
-                  endDate: { lt: billingPeriod.startDate },
+            const previousReading =
+              await prisma.householdMeterReading.findFirst({
+                where: {
+                  householdMeterId: meter.id,
+                  billingPeriod: {
+                    endDate: { lt: billingPeriod.startDate },
+                  },
                 },
-              },
-              orderBy: { billingPeriod: { endDate: 'desc' } },
-            });
+                orderBy: { billingPeriod: { endDate: "desc" } },
+              });
 
-            const consumption = previousReading 
-              ? Number(reading.meterReading) - Number(previousReading.meterReading)
+            const consumption = previousReading
+              ? Number(reading.meterReading) -
+                Number(previousReading.meterReading)
               : Number(reading.meterReading);
 
             const variableCost = consumption * Number(pricing.pricePerUnit);
@@ -334,7 +353,9 @@ router.post('/generate', async (req, res, next) => {
               variableCost,
               fixedCost,
               meterReading: Number(reading.meterReading),
-              previousMeterReading: previousReading ? Number(previousReading.meterReading) : 0,
+              previousMeterReading: previousReading
+                ? Number(previousReading.meterReading)
+                : 0,
             });
           }
         }
@@ -346,7 +367,7 @@ router.post('/generate', async (req, res, next) => {
             totalUtilityCosts,
             totalAmount: totalUtilityCosts,
             dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-            status: 'pending',
+            status: "pending",
           },
           include: {
             household: true,
@@ -370,7 +391,7 @@ router.post('/generate', async (req, res, next) => {
 });
 
 // GET /api/billing/reconciliation/:serviceId/:periodId - Get reconciliation data
-router.get('/reconciliation/:serviceId/:periodId', async (req, res, next) => {
+router.get("/reconciliation/:serviceId/:periodId", async (req, res, next) => {
   try {
     const { serviceId, periodId } = req.params;
 
@@ -405,14 +426,19 @@ router.get('/reconciliation/:serviceId/:periodId', async (req, res, next) => {
       return sum + Number(reading.meterReading);
     }, 0);
 
-    const totalHouseholdConsumption = householdReadings.reduce((sum, reading) => {
-      return sum + Number(reading.meterReading);
-    }, 0);
+    const totalHouseholdConsumption = householdReadings.reduce(
+      (sum, reading) => {
+        return sum + Number(reading.meterReading);
+      },
+      0
+    );
 
-    const reconciliationDifference = totalMainConsumption - totalHouseholdConsumption;
-    const reconciliationPercentage = totalMainConsumption > 0 
-      ? (reconciliationDifference / totalMainConsumption) * 100 
-      : 0;
+    const reconciliationDifference =
+      totalMainConsumption - totalHouseholdConsumption;
+    const reconciliationPercentage =
+      totalMainConsumption > 0
+        ? (reconciliationDifference / totalMainConsumption) * 100
+        : 0;
 
     res.json({
       success: true,
@@ -427,6 +453,95 @@ router.get('/reconciliation/:serviceId/:periodId', async (req, res, next) => {
         },
       },
     });
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// GET /api/billing/quarterly/:id - Get detailed quarterly bill with breakdown
+router.get("/quarterly/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const bill = await prisma.quarterlyBill.findUnique({
+      where: { id },
+      include: {
+        household: {
+          select: {
+            id: true,
+            householdNumber: true,
+            ownerName: true,
+            address: true,
+          },
+        },
+        billingPeriod: {
+          select: {
+            id: true,
+            periodName: true,
+            startDate: true,
+            endDate: true,
+            readingDeadline: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            paymentDate: true,
+            paymentMethod: true,
+            referenceNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        error: "Quarterly bill not found",
+      });
+    }
+
+    // Get detailed utility billing breakdown
+    const utilityBillings = await prisma.utilityBilling.findMany({
+      where: {
+        householdId: bill.householdId,
+        billingPeriodId: bill.billingPeriodId,
+      },
+      include: {
+        service: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            unit: true,
+            serviceType: true,
+          },
+        },
+        reconciliation: {
+          select: {
+            id: true,
+            mainMeterTotal: true,
+            householdTotal: true,
+            difference: true,
+            adjustmentPerHousehold: true,
+          },
+        },
+      },
+      orderBy: {
+        service: { serviceType: "asc" },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...bill,
+        utilityBillings,
+      },
+    });
+    return;
   } catch (error) {
     next(error);
     return;
