@@ -65,6 +65,7 @@ router.get("/", authenticate, async (req, res, next) => {
       success: true,
       data: users,
     });
+    return;
   } catch (error) {
     next(error);
     return;
@@ -126,6 +127,7 @@ router.get("/:id", authenticate, async (req, res, next) => {
       success: true,
       data: user,
     });
+    return;
   } catch (error) {
     next(error);
     return;
@@ -208,6 +210,7 @@ router.post("/", authenticate, async (req, res, next) => {
       success: true,
       data: user,
     });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -321,6 +324,7 @@ router.put("/:id", authenticate, async (req, res, next) => {
       success: true,
       data: user,
     });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -386,8 +390,10 @@ router.delete("/:id", authenticate, async (req, res, next) => {
       success: true,
       message: "User deleted successfully",
     });
+    return;
   } catch (error) {
     next(error);
+    return;
   }
 });
 

@@ -79,6 +79,9 @@ const Billing: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string>("");
 
+  // Bulk operations
+  const [bulkPdfLoading, setBulkPdfLoading] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -174,6 +177,45 @@ const Billing: React.FC = () => {
     setSelectedBillId("");
   };
 
+  const handleDownloadPdf = async (billId: string, householdNumber: number) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/billing/quarterly/${billId}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte ladda ner PDF");
+      }
+
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = `Faktura_Hushall_${householdNumber}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ladda ner PDF");
+    }
+  };
+
   const filteredBills = bills.filter((bill) => {
     if (statusFilter !== "all" && bill.status !== statusFilter) {
       return false;
@@ -191,6 +233,52 @@ const Billing: React.FC = () => {
   const pendingAmount = filteredBills
     .filter((bill) => bill.status === "pending")
     .reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
+
+  const handleBulkPdfDownload = async () => {
+    if (!selectedPeriod) {
+      setError("Välj en faktureringsperiod först");
+      return;
+    }
+
+    setBulkPdfLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/billing/generate-pdfs", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          billingPeriodId: selectedPeriod,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte generera PDF-filer");
+      }
+
+      const result = await response.json();
+
+      // Show success message
+      const { successful, failed } = result.data.summary;
+      if (successful > 0) {
+        setError(null);
+        // You could show a success snackbar here
+        console.log(
+          `Successfully generated ${successful} PDFs${
+            failed > 0 ? `, ${failed} failed` : ""
+          }`
+        );
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Kunde inte generera PDF-filer"
+      );
+    } finally {
+      setBulkPdfLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -333,7 +421,20 @@ const Billing: React.FC = () => {
               </Select>
             </FormControl>
 
-            <Box sx={{ ml: "auto" }}>
+            <Box sx={{ ml: "auto", display: "flex", gap: 1 }}>
+              <Tooltip title="Ladda ner alla PDFs för vald period">
+                <IconButton
+                  onClick={handleBulkPdfDownload}
+                  disabled={!selectedPeriod || bulkPdfLoading}
+                  color="primary"
+                >
+                  {bulkPdfLoading ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <DownloadIcon />
+                  )}
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Uppdatera">
                 <IconButton onClick={fetchData}>
                   <RefreshIcon />
@@ -419,7 +520,15 @@ const Billing: React.FC = () => {
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Ladda ner PDF">
-                        <IconButton size="small">
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            handleDownloadPdf(
+                              bill.id,
+                              bill.household.householdNumber
+                            )
+                          }
+                        >
                           <DownloadIcon />
                         </IconButton>
                       </Tooltip>

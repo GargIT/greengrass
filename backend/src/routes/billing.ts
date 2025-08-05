@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
+import { PDFGenerator } from "../lib/pdfGenerator";
 
 const router = Router();
 
@@ -540,6 +541,267 @@ router.get("/quarterly/:id", async (req, res, next) => {
         ...bill,
         utilityBillings,
       },
+    });
+    return;
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// GET /api/billing/quarterly/:id/pdf - Generate PDF for quarterly bill
+router.get("/quarterly/:id/pdf", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Validate that the bill exists and user has access
+    const bill = await prisma.quarterlyBill.findUnique({
+      where: { id },
+      include: {
+        household: true,
+        billingPeriod: true,
+      },
+    });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: "Quarterly bill not found",
+      });
+    }
+
+    // Role-based access control
+    if (
+      req.user?.role === "MEMBER" &&
+      req.user?.householdId !== bill.householdId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only view your own bills.",
+      });
+    }
+
+    // Generate PDF
+    const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(id);
+
+    // Set response headers for PDF download
+    const billNumber = `${new Date(bill.createdAt).getFullYear()}${(
+      new Date(bill.createdAt).getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${bill.household.householdNumber
+      .toString()
+      .padStart(2, "0")}-${bill.id.substring(0, 8).toUpperCase()}`;
+    const filename = `Faktura_${billNumber}_Hushall_${bill.household.householdNumber}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    res.send(pdfBuffer);
+    return;
+  } catch (error) {
+    console.error("Error generating quarterly bill PDF:", error);
+    next(error);
+    return;
+  }
+});
+
+// GET /api/billing/monthly/:id/pdf - Generate PDF for monthly bill
+router.get("/monthly/:id/pdf", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Validate that the bill exists and user has access
+    const bill = await prisma.monthlyBill.findUnique({
+      where: { id },
+      include: {
+        household: true,
+        billingPeriod: true,
+      },
+    });
+
+    if (!bill) {
+      return res.status(404).json({
+        success: false,
+        message: "Monthly bill not found",
+      });
+    }
+
+    // Role-based access control
+    if (
+      req.user?.role === "MEMBER" &&
+      req.user?.householdId !== bill.householdId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only view your own bills.",
+      });
+    }
+
+    // Generate PDF
+    const pdfBuffer = await PDFGenerator.generateMonthlyBillPDF(id);
+
+    // Set response headers for PDF download
+    const billNumber = `${new Date(bill.createdAt).getFullYear()}${(
+      new Date(bill.createdAt).getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${bill.household.householdNumber
+      .toString()
+      .padStart(2, "0")}-${bill.id.substring(0, 8).toUpperCase()}`;
+    const filename = `Faktura_${billNumber}_Hushall_${bill.household.householdNumber}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+
+    res.send(pdfBuffer);
+    return;
+  } catch (error) {
+    console.error("Error generating monthly bill PDF:", error);
+    next(error);
+    return;
+  }
+});
+
+// POST /api/billing/generate-pdfs - Bulk generate PDFs for multiple bills
+router.post("/generate-pdfs", async (req, res, next) => {
+  try {
+    const schema = z.object({
+      quarterlyBillIds: z.array(z.string().uuid()).optional(),
+      monthlyBillIds: z.array(z.string().uuid()).optional(),
+      billingPeriodId: z.string().uuid().optional(),
+    });
+
+    const { quarterlyBillIds, monthlyBillIds, billingPeriodId } = schema.parse(
+      req.body
+    );
+
+    if (req.user?.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Admin role required for bulk PDF generation.",
+      });
+    }
+
+    const results = [];
+
+    // Generate PDFs for quarterly bills
+    if (quarterlyBillIds && quarterlyBillIds.length > 0) {
+      for (const billId of quarterlyBillIds) {
+        try {
+          const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(billId);
+          results.push({
+            billId,
+            type: "quarterly",
+            success: true,
+            size: pdfBuffer.length,
+          });
+        } catch (error) {
+          results.push({
+            billId,
+            type: "quarterly",
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+    }
+
+    // Generate PDFs for monthly bills
+    if (monthlyBillIds && monthlyBillIds.length > 0) {
+      for (const billId of monthlyBillIds) {
+        try {
+          const pdfBuffer = await PDFGenerator.generateMonthlyBillPDF(billId);
+          results.push({
+            billId,
+            type: "monthly",
+            success: true,
+            size: pdfBuffer.length,
+          });
+        } catch (error) {
+          results.push({
+            billId,
+            type: "monthly",
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+    }
+
+    // Generate PDFs for all bills in a billing period
+    if (billingPeriodId) {
+      const quarterlyBills = await prisma.quarterlyBill.findMany({
+        where: { billingPeriodId },
+        select: { id: true },
+      });
+
+      const monthlyBills = await prisma.monthlyBill.findMany({
+        where: { billingPeriodId },
+        select: { id: true },
+      });
+
+      // Process quarterly bills
+      for (const bill of quarterlyBills) {
+        try {
+          const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(
+            bill.id
+          );
+          results.push({
+            billId: bill.id,
+            type: "quarterly",
+            success: true,
+            size: pdfBuffer.length,
+          });
+        } catch (error) {
+          results.push({
+            billId: bill.id,
+            type: "quarterly",
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      // Process monthly bills
+      for (const bill of monthlyBills) {
+        try {
+          const pdfBuffer = await PDFGenerator.generateMonthlyBillPDF(bill.id);
+          results.push({
+            billId: bill.id,
+            type: "monthly",
+            success: true,
+            size: pdfBuffer.length,
+          });
+        } catch (error) {
+          results.push({
+            billId: bill.id,
+            type: "monthly",
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    const errorCount = results.filter((r) => !r.success).length;
+
+    res.json({
+      success: true,
+      data: {
+        results,
+        summary: {
+          total: results.length,
+          successful: successCount,
+          failed: errorCount,
+        },
+      },
+      message: `Generated ${successCount} PDFs successfully${
+        errorCount > 0 ? `, ${errorCount} failed` : ""
+      }`,
     });
     return;
   } catch (error) {

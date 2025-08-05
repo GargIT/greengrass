@@ -33,7 +33,7 @@ cd backend
 if [ ! -f .env ]; then
     echo "❌ .env file not found in backend directory"
     echo "Please create a .env file with the following content:"
-    echo "DATABASE_URL=\"postgresql://postrgres_user:postgrespass1!!@localhost:5432/grongrasset_db?schema=public\""
+    echo "DATABASE_URL=\"postgresql://postrgres_user:postgrespass1!!@localhost:5432/greengrass_db?schema=public\""
     echo "PORT=3001"
     echo "NODE_ENV=development"
     exit 1

@@ -21,7 +21,7 @@ echo "2. Testing database connection..."
 
 # Try connecting to the container directly
 echo "Trying to connect to postgresql container..."
-if docker exec postgresql psql -U postrgres_user -d grongrasset_db -c "SELECT version();" 2>/dev/null; then
+if docker exec postgresql psql -U postrgres_user -d greengrass_db -c "SELECT version();" 2>/dev/null; then
     echo "✅ Direct container connection works"
 else
     echo "❌ Direct container connection failed"
@@ -50,9 +50,9 @@ echo "=== Connection String Suggestions ==="
 CONTAINER_IP=$(docker inspect postgresql --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
 if [ ! -z "$CONTAINER_IP" ]; then
     echo "Container IP: $CONTAINER_IP"
-    echo "Try: postgresql://postrgres_user:postgrespass1!!@${CONTAINER_IP}:5432/grongrasset_db"
+    echo "Try: postgresql://postrgres_user:postgrespass1!!@${CONTAINER_IP}:5432/grongraset_db"
 fi
 
-echo "Current: postgresql://postrgres_user:postgrespass1!!@postgresql:5432/grongrasset_db"
-echo "Alternative: postgresql://postrgres_user:postgrespass1!!@localhost:5432/grongrasset_db"
+echo "Current: postgresql://postrgres_user:postgrespass1!!@postgresql:5432/grongraset_db"
+echo "Alternative: postgresql://postrgres_user:postgrespass1!!@localhost:5432/grongraset_db"
 echo ""

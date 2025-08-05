@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Typography,
   TextField,
@@ -9,13 +9,13 @@ import {
   CardContent,
   InputAdornment,
   IconButton,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Email as EmailIcon,
   Lock as LockIcon,
   Visibility,
   VisibilityOff,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 interface LoginFormData {
   email: string;
@@ -28,8 +28,8 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [formData, setFormData] = useState<LoginFormData>({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -51,10 +51,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       });
@@ -63,23 +63,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       if (result.success) {
         // Store tokens in localStorage
-        localStorage.setItem('accessToken', result.data.accessToken);
-        localStorage.setItem('refreshToken', result.data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(result.data.user));
+        localStorage.setItem("accessToken", result.data.accessToken);
+        localStorage.setItem("refreshToken", result.data.refreshToken);
+        localStorage.setItem("user", JSON.stringify(result.data.user));
 
         // Call onLogin callback if provided
         if (onLogin) {
           onLogin();
         } else {
           // Fallback to reload
-          window.location.href = '/';
+          window.location.href = "/";
         }
       } else {
-        setError(result.message || 'Login failed');
+        setError(result.message || "Login failed");
       }
     } catch (err) {
-      setError('Network error. Please try again.');
-      console.error('Login error:', err);
+      setError("Network error. Please try again.");
+      console.error("Login error:", err);
     } finally {
       setLoading(false);
     }
@@ -92,15 +92,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)",
         p: 2,
       }}
     >
-      <Card sx={{ maxWidth: 400, width: '100%' }}>
+      <Card sx={{ maxWidth: 400, width: "100%" }}>
         <CardContent sx={{ p: 4 }}>
           <Box textAlign="center" mb={3}>
             <Typography variant="h4" component="h1" gutterBottom>
@@ -142,7 +142,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <TextField
               fullWidth
               name="password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               label="Lösenord"
               value={formData.password}
               onChange={handleInputChange}
@@ -175,19 +175,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               disabled={loading}
               sx={{ mb: 2 }}
             >
-              {loading ? 'Loggar in...' : 'Logga in'}
+              {loading ? "Loggar in..." : "Logga in"}
             </Button>
           </Box>
 
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Box sx={{ mt: 2, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
             <Typography variant="caption" display="block" gutterBottom>
               <strong>Testanvändare:</strong>
             </Typography>
             <Typography variant="caption" display="block">
-              Admin: admin@grongrasset.se / admin123
+              Admin: admin@grongraset.se / admin123
             </Typography>
             <Typography variant="caption" display="block">
-              Medlem: member@grongrasset.se / member123
+              Medlem: member@grongraset.se / member123
             </Typography>
           </Box>
         </CardContent>

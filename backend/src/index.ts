@@ -25,6 +25,9 @@ import { errorHandler } from "./middleware/errorHandler";
 import { notFound } from "./middleware/notFound";
 import { authenticate } from "./middleware/auth";
 
+// Import PDF service for cleanup
+import { PDFGenerator } from "./lib/pdfGenerator";
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -83,7 +86,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Gröngräset Backend Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
@@ -92,6 +95,26 @@ app.listen(PORT, () => {
   console.log(`📖 API Documentation available at:`);
   console.log(`   • http://localhost:${PORT}/api-docs`);
   console.log(`   • http://192.168.11.7:${PORT}/api-docs`);
+  console.log(`📄 PDF invoice generation enabled`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+  await PDFGenerator.closeBrowser();
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully...");
+  await PDFGenerator.closeBrowser();
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
 });
 
 export default app;

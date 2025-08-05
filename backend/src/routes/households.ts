@@ -173,7 +173,7 @@ router.delete("/:id", async (req, res, next) => {
 });
 
 /**
- * Calculate and update ownership ratios (andelstal) for all active households
+ * Calculate ownership ratios for equal shares (deprecated - using 1/14 for all)
  * Each household gets an equal share: 1 / total_active_households
  */
 async function updateOwnershipRatios() {
@@ -187,22 +187,17 @@ async function updateOwnershipRatios() {
       return;
     }
 
-    // Calculate equal ratio for each household
+    // Calculate equal ratio for each household (but don't update since andelstal field is removed)
     const newRatio = 1 / activeHouseholdCount;
 
-    // Update all active households with the new ratio
-    await prisma.household.updateMany({
-      where: { isActive: true },
-      data: { andelstal: newRatio },
-    });
-
+    // Note: andelstal field removed from schema - using equal shares (1/14) for all households
     console.log(
-      `Updated ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(
+      `Equal ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(
         8
-      )} each`
+      )} each (hardcoded to 1/14)`
     );
   } catch (error) {
-    console.error("Error updating ownership ratios:", error);
+    console.error("Error calculating ownership ratios:", error);
     throw error;
   }
 }
@@ -218,17 +213,17 @@ router.put("/recalculate-ratios", async (req, res, next) => {
         id: true,
         householdNumber: true,
         ownerName: true,
-        andelstal: true,
+        // andelstal field removed - using equal shares (1/14) for all
       },
     });
 
     res.json({
       success: true,
-      message: "Ownership ratios recalculated successfully",
+      message:
+        "Equal ownership shares confirmed (1/14 for all active households)",
       data: {
         totalActiveHouseholds: activeHouseholds.length,
-        newRatio:
-          activeHouseholds.length > 0 ? activeHouseholds[0].andelstal : null,
+        newRatio: activeHouseholds.length > 0 ? 1 / 14 : null, // Equal shares
         households: activeHouseholds,
       },
     });

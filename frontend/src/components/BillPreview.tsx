@@ -16,6 +16,9 @@ import {
   TableRow,
   Paper,
   IconButton,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import {
   Close as CloseIcon,
@@ -88,6 +91,8 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
   const [bill, setBill] = React.useState<DetailedQuarterlyBill | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [downloadingPDF, setDownloadingPDF] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
 
   const fetchBillDetails = React.useCallback(async () => {
     if (!billId) return;
@@ -131,6 +136,58 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
     return new Date(date).toLocaleDateString("sv-SE");
   };
 
+  const handleDownloadPDF = async () => {
+    if (!billId || !bill) return;
+
+    setDownloadingPDF(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/billing/quarterly/${billId}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte generera PDF");
+      }
+
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = `Faktura_Hushall_${bill.household.householdNumber}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      setShowSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ladda ner PDF");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if (bill) {
+      window.print();
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -149,11 +206,19 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
             📄 Faktura - {bill?.billingPeriod.periodName}
           </Typography>
           <Box>
-            <IconButton color="primary" disabled={!bill}>
+            <IconButton color="primary" disabled={!bill} onClick={handlePrint}>
               <PrintIcon />
             </IconButton>
-            <IconButton color="primary" disabled={!bill}>
-              <DownloadIcon />
+            <IconButton
+              color="primary"
+              disabled={!bill}
+              onClick={handleDownloadPDF}
+            >
+              {downloadingPDF ? (
+                <CircularProgress size={24} />
+              ) : (
+                <DownloadIcon />
+              )}
             </IconButton>
             <IconButton onClick={onClose}>
               <CloseIcon />
@@ -464,6 +529,18 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
           Stäng
         </Button>
       </DialogActions>
+
+      {/* Success notification */}
+      <Snackbar
+        open={showSuccess}
+        autoHideDuration={4000}
+        onClose={() => setShowSuccess(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setShowSuccess(false)} severity="success">
+          PDF-faktura har laddats ner framgångsrikt!
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 };

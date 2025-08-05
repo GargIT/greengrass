@@ -1,10 +1,10 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma';
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
 
 const router = Router();
 
 // GET /api/reports/dashboard - Get dashboard overview data
-router.get('/dashboard', async (req, res, next) => {
+router.get("/dashboard", async (req, res, next) => {
   try {
     // Get current year and quarter
     const currentYear = new Date().getFullYear();
@@ -18,11 +18,11 @@ router.get('/dashboard', async (req, res, next) => {
 
     // Get pending bills count
     const pendingQuarterlyBills = await prisma.quarterlyBill.count({
-      where: { status: 'pending' },
+      where: { status: "pending" },
     });
 
     const pendingMonthlyBills = await prisma.monthlyBill.count({
-      where: { status: 'pending' },
+      where: { status: "pending" },
     });
 
     // Get total revenue for current year
@@ -32,7 +32,7 @@ router.get('/dashboard', async (req, res, next) => {
           gte: new Date(currentYear, 0, 1),
           lt: new Date(currentYear + 1, 0, 1),
         },
-        status: 'paid',
+        status: "paid",
       },
       _sum: {
         totalAmount: true,
@@ -45,7 +45,7 @@ router.get('/dashboard', async (req, res, next) => {
           gte: new Date(currentYear, 0, 1),
           lt: new Date(currentYear + 1, 0, 1),
         },
-        status: 'paid',
+        status: "paid",
       },
       _sum: {
         totalAmount: true,
@@ -60,7 +60,7 @@ router.get('/dashboard', async (req, res, next) => {
     // Get recent meter readings
     const recentReadings = await prisma.householdMeterReading.findMany({
       take: 10,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         householdMeter: {
           include: {
@@ -93,7 +93,9 @@ router.get('/dashboard', async (req, res, next) => {
           totalHouseholds,
           activeServices,
           pendingBills: pendingQuarterlyBills + pendingMonthlyBills,
-          totalRevenue: Number(quarterlyRevenue._sum.totalAmount || 0) + Number(monthlyRevenue._sum.totalAmount || 0),
+          totalRevenue:
+            Number(quarterlyRevenue._sum.totalAmount || 0) +
+            Number(monthlyRevenue._sum.totalAmount || 0),
         },
         recentReadings,
       },
@@ -105,13 +107,15 @@ router.get('/dashboard', async (req, res, next) => {
 });
 
 // GET /api/reports/consumption/:serviceId - Get consumption report for a service
-router.get('/consumption/:serviceId', async (req, res, next) => {
+router.get("/consumption/:serviceId", async (req, res, next) => {
   try {
     const { serviceId } = req.params;
     const { year, period } = req.query;
 
-    const currentYear = year ? parseInt(year as string) : new Date().getFullYear();
-    
+    const currentYear = year
+      ? parseInt(year as string)
+      : new Date().getFullYear();
+
     // Get service details
     const service = await prisma.utilityService.findUnique({
       where: { id: serviceId },
@@ -120,7 +124,7 @@ router.get('/consumption/:serviceId', async (req, res, next) => {
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found',
+        message: "Service not found",
       });
     }
 
@@ -158,15 +162,15 @@ router.get('/consumption/:serviceId', async (req, res, next) => {
         },
       },
       orderBy: [
-        { billingPeriod: { startDate: 'asc' } },
-        { householdMeter: { household: { householdNumber: 'asc' } } },
+        { billingPeriod: { startDate: "asc" } },
+        { householdMeter: { household: { householdNumber: "asc" } } },
       ],
     });
 
     // Group by household and calculate consumption
     const householdConsumption = readings.reduce((acc, reading) => {
       const householdId = reading.householdMeter.household.id;
-      
+
       if (!acc[householdId]) {
         acc[householdId] = {
           household: reading.householdMeter.household,
@@ -202,10 +206,10 @@ router.get('/consumption/:serviceId', async (req, res, next) => {
 });
 
 // GET /api/reports/billing/:periodId - Get billing report for a period
-router.get('/billing/:periodId', async (req, res, next) => {
+router.get("/billing/:periodId", async (req, res, next) => {
   try {
     const { periodId } = req.params;
-    const { type = 'quarterly' } = req.query;
+    const { type = "quarterly" } = req.query;
 
     // Get billing period
     const billingPeriod = await prisma.billingPeriod.findUnique({
@@ -215,11 +219,11 @@ router.get('/billing/:periodId', async (req, res, next) => {
     if (!billingPeriod) {
       return res.status(404).json({
         success: false,
-        message: 'Billing period not found',
+        message: "Billing period not found",
       });
     }
 
-    if (type === 'quarterly') {
+    if (type === "quarterly") {
       const bills = await prisma.quarterlyBill.findMany({
         where: { billingPeriodId: periodId },
         include: {
@@ -229,23 +233,35 @@ router.get('/billing/:periodId', async (req, res, next) => {
               householdNumber: true,
               ownerName: true,
               email: true,
-              andelstal: true,
+              // andelstal field removed - using equal shares (1/14) for all
             },
           },
           payments: true,
         },
-        orderBy: { household: { householdNumber: 'asc' } },
+        orderBy: { household: { householdNumber: "asc" } },
       });
 
       const summary = {
         totalBills: bills.length,
-        totalAmount: bills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0),
-        totalUtilityCosts: bills.reduce((sum, bill) => sum + Number(bill.totalUtilityCosts), 0),
-        totalMemberFees: bills.reduce((sum, bill) => sum + Number(bill.memberFee), 0),
-        totalSharedCosts: bills.reduce((sum, bill) => sum + Number(bill.sharedCosts), 0),
-        paidBills: bills.filter(bill => bill.status === 'paid').length,
-        pendingBills: bills.filter(bill => bill.status === 'pending').length,
-        overdueBills: bills.filter(bill => bill.status === 'overdue').length,
+        totalAmount: bills.reduce(
+          (sum, bill) => sum + Number(bill.totalAmount),
+          0
+        ),
+        totalUtilityCosts: bills.reduce(
+          (sum, bill) => sum + Number(bill.totalUtilityCosts),
+          0
+        ),
+        totalMemberFees: bills.reduce(
+          (sum, bill) => sum + Number(bill.memberFee),
+          0
+        ),
+        totalSharedCosts: bills.reduce(
+          (sum, bill) => sum + Number(bill.sharedCosts),
+          0
+        ),
+        paidBills: bills.filter((bill) => bill.status === "paid").length,
+        pendingBills: bills.filter((bill) => bill.status === "pending").length,
+        overdueBills: bills.filter((bill) => bill.status === "overdue").length,
       };
 
       return res.json({
@@ -270,16 +286,22 @@ router.get('/billing/:periodId', async (req, res, next) => {
           },
           payments: true,
         },
-        orderBy: { household: { householdNumber: 'asc' } },
+        orderBy: { household: { householdNumber: "asc" } },
       });
 
       const summary = {
         totalBills: bills.length,
-        totalAmount: bills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0),
-        totalUtilityCosts: bills.reduce((sum, bill) => sum + Number(bill.totalUtilityCosts), 0),
-        paidBills: bills.filter(bill => bill.status === 'paid').length,
-        pendingBills: bills.filter(bill => bill.status === 'pending').length,
-        overdueBills: bills.filter(bill => bill.status === 'overdue').length,
+        totalAmount: bills.reduce(
+          (sum, bill) => sum + Number(bill.totalAmount),
+          0
+        ),
+        totalUtilityCosts: bills.reduce(
+          (sum, bill) => sum + Number(bill.totalUtilityCosts),
+          0
+        ),
+        paidBills: bills.filter((bill) => bill.status === "paid").length,
+        pendingBills: bills.filter((bill) => bill.status === "pending").length,
+        overdueBills: bills.filter((bill) => bill.status === "overdue").length,
       };
 
       return res.json({
@@ -298,10 +320,12 @@ router.get('/billing/:periodId', async (req, res, next) => {
 });
 
 // GET /api/reports/payments - Get payments report
-router.get('/payments', async (req, res, next) => {
+router.get("/payments", async (req, res, next) => {
   try {
     const { year, month, householdId } = req.query;
-    const currentYear = year ? parseInt(year as string) : new Date().getFullYear();
+    const currentYear = year
+      ? parseInt(year as string)
+      : new Date().getFullYear();
 
     let startDate = new Date(currentYear, 0, 1);
     let endDate = new Date(currentYear + 1, 0, 1);
@@ -357,14 +381,17 @@ router.get('/payments', async (req, res, next) => {
           },
         },
       },
-      orderBy: { paymentDate: 'desc' },
+      orderBy: { paymentDate: "desc" },
     });
 
     const summary = {
       totalPayments: payments.length,
-      totalAmount: payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
-      quarterlyPayments: payments.filter(p => p.quarterlyBillId).length,
-      monthlyPayments: payments.filter(p => p.monthlyBillId).length,
+      totalAmount: payments.reduce(
+        (sum, payment) => sum + Number(payment.amount),
+        0
+      ),
+      quarterlyPayments: payments.filter((p) => p.quarterlyBillId).length,
+      monthlyPayments: payments.filter((p) => p.monthlyBillId).length,
     };
 
     res.json({
@@ -372,7 +399,10 @@ router.get('/payments', async (req, res, next) => {
       data: {
         payments,
         summary,
-        period: { year: currentYear, month: month ? parseInt(month as string) : null },
+        period: {
+          year: currentYear,
+          month: month ? parseInt(month as string) : null,
+        },
       },
     });
   } catch (error) {
@@ -382,14 +412,14 @@ router.get('/payments', async (req, res, next) => {
 });
 
 // GET /api/reports/export/:type - Export data as CSV
-router.get('/export/:type', async (req, res, next) => {
+router.get("/export/:type", async (req, res, next) => {
   try {
     const { type } = req.params;
     const { periodId, serviceId, year } = req.query;
 
     // This is a placeholder for CSV export functionality
     // In a real implementation, you would generate CSV data and return it
-    
+
     res.json({
       success: true,
       message: `Export functionality for ${type} would be implemented here`,
