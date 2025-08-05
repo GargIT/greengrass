@@ -207,9 +207,13 @@ const MeterReadings: React.FC = () => {
   // Fetch data functions
   const fetchBillingPeriods = useCallback(async () => {
     try {
-      const response = await fetch("/api/billing/periods", {
-        headers: getAuthHeaders(),
-      });
+      // For meter readings page, only fetch past and current/next periods
+      const response = await fetch(
+        "/api/billing/periods?forMeterReadings=true",
+        {
+          headers: getAuthHeaders(),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to fetch billing periods");
 

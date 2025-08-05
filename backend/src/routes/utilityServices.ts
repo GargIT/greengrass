@@ -10,13 +10,24 @@ const utilityServiceSchema = z.object({
   description: z.string().optional(),
   unit: z.string().min(1).max(20),
   serviceType: z
-    .enum(["WATER", "ELECTRICITY", "HEATING", "INTERNET", "OTHER"])
+    .enum([
+      "WATER",
+      "ELECTRICITY",
+      "HEATING",
+      "INTERNET",
+      "MEMBERSHIP",
+      "OTHER",
+    ])
     .default("OTHER"),
   isActive: z.boolean().default(true),
   isMandatory: z.boolean().default(false),
+  requiresReadings: z.boolean().default(true),
   billingFrequency: z
-    .enum(["MONTHLY", "QUARTERLY", "ANNUALLY"])
-    .default("QUARTERLY"),
+    .enum(["MONTHLY", "QUARTERLY", "TERTIARY", "ANNUALLY"])
+    .default("TERTIARY"),
+  billingInterval: z
+    .enum(["MONTHLY", "QUARTERLY", "TERTIARY", "BIANNUALLY", "ANNUALLY"])
+    .optional(),
 });
 
 // GET /api/utility-services

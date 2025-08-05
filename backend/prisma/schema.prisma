@@ -35,8 +35,10 @@ model UtilityService {
   isActive               Boolean                 @default(true) @map("is_active")
   isMandatory            Boolean                 @default(false) @map("is_mandatory")
   billingFrequency       BillingFrequency        @default(QUARTERLY) @map("billing_frequency")
+  billingInterval        BillingInterval?        @map("billing_interval")  // New, more descriptive field
   hasMainMeters          Boolean                 @default(false) @map("has_main_meters")
   mainMeterCount         Int                     @default(0) @map("main_meter_count")
+  requiresReadings       Boolean                 @default(true) @map("requires_readings")
   readingFrequency       Int                     @default(3) @map("reading_frequency")
   requiresReconciliation Boolean                 @default(false) @map("requires_reconciliation")
   createdAt              DateTime                @default(now()) @map("created_at")
@@ -284,6 +286,7 @@ model RefreshToken {
 enum PeriodType {
   quarterly
   monthly
+  tertiary      // 3 times per year (every 4 months)
 
   @@map("period_type")
 }
@@ -313,5 +316,14 @@ enum ServiceType {
 enum BillingFrequency {
   MONTHLY
   QUARTERLY
+  TERTIARY      // 3 times per year (every 4 months)
   ANNUALLY
+}
+
+enum BillingInterval {
+  MONTHLY        // Månadsvis (12 gånger/år)
+  QUARTERLY      // Kvartalsvis (4 gånger/år, var 3:e månad) 
+  TERTIARY       // Tertiärt (3 gånger/år, var 4:e månad)
+  BIANNUALLY     // Halvårsvis (2 gånger/år, var 6:e månad)
+  ANNUALLY       // Årligen (1 gång/år)
 }

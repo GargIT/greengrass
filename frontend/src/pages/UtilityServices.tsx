@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -19,15 +19,14 @@ import {
   FormHelperText,
   Switch,
   FormControlLabel,
-  InputAdornment,
-} from '@mui/material';
+} from "@mui/material";
 import {
   DataGrid,
   GridActionsCellItem,
   GridToolbar,
   type GridColDef,
   type GridRowParams,
-} from '@mui/x-data-grid';
+} from "@mui/x-data-grid";
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -36,33 +35,55 @@ import {
   Bolt as ElectricityIcon,
   Whatshot as HeatingIcon,
   Wifi as InternetIcon,
-} from '@mui/icons-material';
+  Group as MembershipIcon,
+} from "@mui/icons-material";
 
 interface UtilityService {
   id: string;
   name: string;
   description?: string;
   unit: string;
-  unitPrice: number;
-  serviceType: 'WATER' | 'ELECTRICITY' | 'HEATING' | 'INTERNET' | 'OTHER';
+  serviceType:
+    | "WATER"
+    | "ELECTRICITY"
+    | "HEATING"
+    | "INTERNET"
+    | "MEMBERSHIP"
+    | "OTHER";
   isActive: boolean;
   isMandatory: boolean;
-  billingFrequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY';
+  requiresReadings?: boolean;
+  billingFrequency: "MONTHLY" | "QUARTERLY" | "TERTIARY" | "ANNUALLY";
+  billingInterval?:
+    | "MONTHLY"
+    | "QUARTERLY"
+    | "TERTIARY"
+    | "BIANNUALLY"
+    | "ANNUALLY";
   createdAt: string;
   _count?: {
+    mainMeters: number;
     householdMeters: number;
   };
+  pricing?: Array<{
+    id: string;
+    pricePerUnit: number;
+    fixedFeePerHousehold: number;
+    effectiveDate: string;
+    isActive: boolean;
+  }>;
 }
 
 interface ServiceFormData {
   name: string;
   description?: string;
   unit: string;
-  unitPrice?: number;
   serviceType: string;
   isActive: boolean;
   isMandatory: boolean;
+  requiresReadings?: boolean;
   billingFrequency: string;
+  billingInterval?: string;
 }
 
 const serviceTypeIcons = {
@@ -70,42 +91,47 @@ const serviceTypeIcons = {
   ELECTRICITY: <ElectricityIcon />,
   HEATING: <HeatingIcon />,
   INTERNET: <InternetIcon />,
+  MEMBERSHIP: <MembershipIcon />,
   OTHER: <AddIcon />,
 };
 
 const serviceTypeLabels = {
-  WATER: 'Vatten',
-  ELECTRICITY: 'El',
-  HEATING: 'Värme',
-  INTERNET: 'Internet',
-  OTHER: 'Övrigt',
+  WATER: "Vatten",
+  ELECTRICITY: "El",
+  HEATING: "Värme",
+  INTERNET: "Internet",
+  MEMBERSHIP: "Medlemsavgift",
+  OTHER: "Övrigt",
 };
 
 const billingFrequencyLabels = {
-  MONTHLY: 'Månatlig',
-  QUARTERLY: 'Kvartalsvis',
-  ANNUALLY: 'Årlig',
+  MONTHLY: "Månatlig",
+  QUARTERLY: "Kvartalsvis",
+  TERTIARY: "Tertial (var 4:e månad)",
+  ANNUALLY: "Årlig",
 };
 
 const UtilityServices: React.FC = () => {
   const [services, setServices] = useState<UtilityService[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<UtilityService | null>(null);
+  const [selectedService, setSelectedService] = useState<UtilityService | null>(
+    null
+  );
   const [formData, setFormData] = useState<ServiceFormData>({
-    name: '',
-    description: '',
-    unit: '',
-    unitPrice: 0,
-    serviceType: 'WATER',
+    name: "",
+    description: "",
+    unit: "",
+    serviceType: "WATER",
     isActive: true,
     isMandatory: false,
-    billingFrequency: 'QUARTERLY',
+    requiresReadings: true,
+    billingFrequency: "TERTIARY",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -113,14 +139,18 @@ const UtilityServices: React.FC = () => {
   // DataGrid column definitions
   const columns: GridColDef[] = [
     {
-      field: 'serviceType',
-      headerName: 'Typ',
+      field: "serviceType",
+      headerName: "Typ",
       flex: 0.4,
       minWidth: 80,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
-        <Tooltip title={serviceTypeLabels[params.value as keyof typeof serviceTypeLabels]}>
+        <Tooltip
+          title={
+            serviceTypeLabels[params.value as keyof typeof serviceTypeLabels]
+          }
+        >
           <Box display="flex" justifyContent="center" color="action.active">
             {serviceTypeIcons[params.value as keyof typeof serviceTypeIcons]}
           </Box>
@@ -128,15 +158,21 @@ const UtilityServices: React.FC = () => {
       ),
     },
     {
-      field: 'name',
-      headerName: 'Tjänst',
+      field: "name",
+      headerName: "Tjänst",
       flex: 1,
       minWidth: 150,
       renderCell: (params) => (
         <Box>
-          <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
+          <Typography variant="body2" fontWeight="medium">
+            {params.value}
+          </Typography>
           {params.row.description && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block" }}
+            >
               {params.row.description}
             </Typography>
           )}
@@ -144,54 +180,63 @@ const UtilityServices: React.FC = () => {
       ),
     },
     {
-      field: 'unit',
-      headerName: 'Enhet',
+      field: "unit",
+      headerName: "Enhet",
       flex: 0.5,
       minWidth: 80,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
     },
     {
-      field: 'unitPrice',
-      headerName: 'Pris/Enhet',
+      field: "pricing",
+      headerName: "Pris/Enhet",
       flex: 0.7,
       minWidth: 100,
-      type: 'number',
-      align: 'right',
-      headerAlign: 'right',
-      renderCell: (params) => (
-        <Typography variant="body2">
-          {params.value?.toLocaleString('sv-SE', { 
-            style: 'currency', 
-            currency: 'SEK',
-            minimumFractionDigits: 2,
-          })}
-        </Typography>
-      ),
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) => {
+        const currentPricing = params.row.pricing?.[0];
+        if (!currentPricing) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        return (
+          <Typography variant="body2">
+            {currentPricing.pricePerUnit?.toLocaleString("sv-SE", {
+              style: "currency",
+              currency: "SEK",
+              minimumFractionDigits: 2,
+            })}
+          </Typography>
+        );
+      },
     },
     {
-      field: 'billingFrequency',
-      headerName: 'Fakturering',
+      field: "billingFrequency",
+      headerName: "Fakturering",
       flex: 0.8,
       minWidth: 110,
       renderCell: (params) => (
         <Chip
-          label={billingFrequencyLabels[params.value as keyof typeof billingFrequencyLabels]}
+          label={
+            billingFrequencyLabels[
+              params.value as keyof typeof billingFrequencyLabels
+            ]
+          }
           size="small"
           variant="outlined"
         />
       ),
     },
     {
-      field: 'status',
-      headerName: 'Status',
+      field: "status",
+      headerName: "Status",
       flex: 0.8,
       minWidth: 120,
       renderCell: (params) => (
         <Box display="flex" gap={0.5}>
           <Chip
-            label={params.row.isActive ? 'Aktiv' : 'Inaktiv'}
-            color={params.row.isActive ? 'success' : 'default'}
+            label={params.row.isActive ? "Aktiv" : "Inaktiv"}
+            color={params.row.isActive ? "success" : "default"}
             size="small"
           />
           {params.row.isMandatory && (
@@ -206,12 +251,12 @@ const UtilityServices: React.FC = () => {
       ),
     },
     {
-      field: 'householdCount',
-      headerName: 'Hushåll',
+      field: "householdCount",
+      headerName: "Hushåll",
       flex: 0.5,
       minWidth: 80,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
         <Typography variant="body2">
           {params.row._count?.householdMeters || 0}
@@ -219,9 +264,9 @@ const UtilityServices: React.FC = () => {
       ),
     },
     {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Åtgärder',
+      field: "actions",
+      type: "actions",
+      headerName: "Åtgärder",
       flex: 0.6,
       minWidth: 120,
       getActions: (params: GridRowParams) => [
@@ -255,22 +300,22 @@ const UtilityServices: React.FC = () => {
   const fetchServices = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch('/api/utility-services', {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/utility-services", {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       const result = await response.json();
-      
+
       if (result.success) {
         setServices(result.data);
       } else {
-        setError('Failed to fetch utility services');
+        setError("Failed to fetch utility services");
       }
     } catch (err) {
-      setError('Network error while fetching services');
-      console.error('Error fetching services:', err);
+      setError("Network error while fetching services");
+      console.error("Error fetching services:", err);
     } finally {
       setLoading(false);
     }
@@ -278,14 +323,14 @@ const UtilityServices: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      description: '',
-      unit: '',
-      unitPrice: 0,
-      serviceType: 'WATER',
+      name: "",
+      description: "",
+      unit: "",
+      serviceType: "WATER",
       isActive: true,
       isMandatory: false,
-      billingFrequency: 'QUARTERLY',
+      requiresReadings: true,
+      billingFrequency: "TERTIARY",
     });
     setFormErrors({});
   };
@@ -299,12 +344,12 @@ const UtilityServices: React.FC = () => {
     setSelectedService(service);
     setFormData({
       name: service.name,
-      description: service.description || '',
+      description: service.description || "",
       unit: service.unit,
-      unitPrice: service.unitPrice,
       serviceType: service.serviceType,
       isActive: service.isActive,
       isMandatory: service.isMandatory,
+      requiresReadings: service.requiresReadings || false,
       billingFrequency: service.billingFrequency,
     });
     setFormErrors({});
@@ -321,15 +366,17 @@ const UtilityServices: React.FC = () => {
     setFormErrors({});
 
     try {
-      const url = isEdit ? `/api/utility-services/${selectedService?.id}` : '/api/utility-services';
-      const method = isEdit ? 'PUT' : 'POST';
-      const token = localStorage.getItem('accessToken');
-      
+      const url = isEdit
+        ? `/api/utility-services/${selectedService?.id}`
+        : "/api/utility-services";
+      const method = isEdit ? "PUT" : "POST";
+      const token = localStorage.getItem("accessToken");
+
       const response = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(formData),
       });
@@ -345,43 +392,61 @@ const UtilityServices: React.FC = () => {
         if (result.errors) {
           setFormErrors(result.errors);
         } else {
-          setError(result.message || 'Failed to save service');
+          setError(result.message || "Failed to save service");
         }
       }
     } catch (err) {
-      setError('Network error while saving service');
-      console.error('Error saving service:', err);
+      setError("Network error while saving service");
+      console.error("Error saving service:", err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: keyof ServiceFormData, value: string | number | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof ServiceFormData,
+    value: string | number | boolean
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (formErrors[field]) {
-      setFormErrors(prev => ({ ...prev, [field]: '' }));
+      setFormErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box 
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        width: '100%',
-        overflow: 'hidden',
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        overflow: "hidden",
       }}
     >
-      <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2, flexShrink: 0, px: { xs: 2, sm: 3, md: 4 }, pt: { xs: 2, sm: 3, md: 4 } }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{
+          mb: 2,
+          flexShrink: 0,
+          px: { xs: 2, sm: 3, md: 4 },
+          pt: { xs: 2, sm: 3, md: 4 },
+        }}
+      >
         <Typography variant="h4" component="h1">
           Tjänstehantering
         </Typography>
@@ -395,18 +460,22 @@ const UtilityServices: React.FC = () => {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2, flexShrink: 0, mx: { xs: 2, sm: 3, md: 4 } }} onClose={() => setError(null)}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2, flexShrink: 0, mx: { xs: 2, sm: 3, md: 4 } }}
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
 
       {/* Services DataGrid */}
-      <Box 
-        sx={{ 
+      <Box
+        sx={{
           flex: 1,
           minHeight: 0,
-          width: '100%',
-          height: '100%',
+          width: "100%",
+          height: "100%",
           px: { xs: 2, sm: 3, md: 4 },
           pb: { xs: 2, sm: 3, md: 4 },
         }}
@@ -432,21 +501,21 @@ const UtilityServices: React.FC = () => {
             },
           }}
           sx={{
-            height: '100%',
-            width: '100%',
-            border: 'none',
-            '& .MuiDataGrid-main': {
-              height: '100%',
+            height: "100%",
+            width: "100%",
+            border: "none",
+            "& .MuiDataGrid-main": {
+              height: "100%",
             },
-            '& .MuiDataGrid-virtualScroller': {
-              height: '100%',
+            "& .MuiDataGrid-virtualScroller": {
+              height: "100%",
             },
-            '& .MuiDataGrid-cell': {
-              display: 'flex',
-              alignItems: 'center',
+            "& .MuiDataGrid-cell": {
+              display: "flex",
+              alignItems: "center",
             },
-            '& .MuiDataGrid-row:hover': {
-              backgroundColor: 'action.hover',
+            "& .MuiDataGrid-row:hover": {
+              backgroundColor: "action.hover",
             },
           }}
         />
@@ -464,26 +533,30 @@ const UtilityServices: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          {isCreateDialogOpen ? 'Lägg till ny tjänst' : 'Redigera tjänst'}
+          {isCreateDialogOpen ? "Lägg till ny tjänst" : "Redigera tjänst"}
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <Box sx={{ display: "flex", gap: 2 }}>
               <FormControl fullWidth error={!!formErrors.name}>
                 <InputLabel>Tjänstens namn</InputLabel>
                 <OutlinedInput
                   label="Tjänstens namn"
                   value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
                 />
-                {formErrors.name && <FormHelperText>{formErrors.name}</FormHelperText>}
+                {formErrors.name && (
+                  <FormHelperText>{formErrors.name}</FormHelperText>
+                )}
               </FormControl>
               <FormControl fullWidth error={!!formErrors.serviceType}>
                 <InputLabel>Typ av tjänst</InputLabel>
                 <Select
                   label="Typ av tjänst"
                   value={formData.serviceType}
-                  onChange={(e) => handleInputChange('serviceType', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("serviceType", e.target.value)
+                  }
                 >
                   {Object.entries(serviceTypeLabels).map(([key, label]) => (
                     <MenuItem key={key} value={key}>
@@ -494,85 +567,97 @@ const UtilityServices: React.FC = () => {
                     </MenuItem>
                   ))}
                 </Select>
-                {formErrors.serviceType && <FormHelperText>{formErrors.serviceType}</FormHelperText>}
+                {formErrors.serviceType && (
+                  <FormHelperText>{formErrors.serviceType}</FormHelperText>
+                )}
               </FormControl>
             </Box>
-            
+
             <FormControl fullWidth error={!!formErrors.description}>
               <InputLabel>Beskrivning (valfri)</InputLabel>
               <OutlinedInput
                 label="Beskrivning (valfri)"
                 value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
                 multiline
                 rows={2}
               />
-              {formErrors.description && <FormHelperText>{formErrors.description}</FormHelperText>}
+              {formErrors.description && (
+                <FormHelperText>{formErrors.description}</FormHelperText>
+              )}
             </FormControl>
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
               <FormControl fullWidth error={!!formErrors.unit}>
                 <InputLabel>Mätenhet</InputLabel>
                 <OutlinedInput
                   label="Mätenhet"
                   value={formData.unit}
-                  onChange={(e) => handleInputChange('unit', e.target.value)}
+                  onChange={(e) => handleInputChange("unit", e.target.value)}
                   placeholder="t.ex. m³, kWh, st"
                 />
-                {formErrors.unit && <FormHelperText>{formErrors.unit}</FormHelperText>}
+                {formErrors.unit && (
+                  <FormHelperText>{formErrors.unit}</FormHelperText>
+                )}
               </FormControl>
-              <FormControl fullWidth error={!!formErrors.unitPrice}>
-                <InputLabel>Pris per enhet</InputLabel>
-                <OutlinedInput
-                  type="number"
-                  label="Pris per enhet"
-                  value={formData.unitPrice}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const numValue = value === '' ? 0 : parseFloat(value);
-                    handleInputChange('unitPrice', isNaN(numValue) ? 0 : numValue);
-                  }}
-                  inputProps={{ min: 0, step: 0.01 }}
-                  endAdornment={<InputAdornment position="end">kr</InputAdornment>}
-                />
-                {formErrors.unitPrice && <FormHelperText>{formErrors.unitPrice}</FormHelperText>}
+              <FormControl fullWidth error={!!formErrors.billingFrequency}>
+                <InputLabel>Faktureringsfrekvens</InputLabel>
+                <Select
+                  label="Faktureringsfrekvens"
+                  value={formData.billingFrequency}
+                  onChange={(e) =>
+                    handleInputChange("billingFrequency", e.target.value)
+                  }
+                >
+                  {Object.entries(billingFrequencyLabels).map(
+                    ([key, label]) => (
+                      <MenuItem key={key} value={key}>
+                        {label}
+                      </MenuItem>
+                    )
+                  )}
+                </Select>
+                {formErrors.billingFrequency && (
+                  <FormHelperText>{formErrors.billingFrequency}</FormHelperText>
+                )}
               </FormControl>
             </Box>
-            
-            <FormControl fullWidth error={!!formErrors.billingFrequency}>
-              <InputLabel>Faktureringsfrekvens</InputLabel>
-              <Select
-                label="Faktureringsfrekvens"
-                value={formData.billingFrequency}
-                onChange={(e) => handleInputChange('billingFrequency', e.target.value)}
-              >
-                {Object.entries(billingFrequencyLabels).map(([key, label]) => (
-                  <MenuItem key={key} value={key}>
-                    {label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {formErrors.billingFrequency && <FormHelperText>{formErrors.billingFrequency}</FormHelperText>}
-            </FormControl>
-            
-            <Box sx={{ display: 'flex', gap: 2 }}>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isActive}
-                    onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                    onChange={(e) =>
+                      handleInputChange("isActive", e.target.checked)
+                    }
                   />
                 }
-                label="Tjänst aktiv"
+                label="Aktiv tjänst"
               />
               <FormControlLabel
                 control={
                   <Switch
                     checked={formData.isMandatory}
-                    onChange={(e) => handleInputChange('isMandatory', e.target.checked)}
+                    onChange={(e) =>
+                      handleInputChange("isMandatory", e.target.checked)
+                    }
                   />
                 }
-                label="Obligatorisk för alla hushåll"
+                label="Obligatorisk tjänst"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.requiresReadings}
+                    onChange={(e) =>
+                      handleInputChange("requiresReadings", e.target.checked)
+                    }
+                  />
+                }
+                label="Kräver mätaravläsning"
               />
             </Box>
           </Box>
@@ -592,7 +677,7 @@ const UtilityServices: React.FC = () => {
             variant="contained"
             disabled={submitting}
           >
-            {submitting ? 'Sparar...' : (isCreateDialogOpen ? 'Skapa' : 'Spara')}
+            {submitting ? "Sparar..." : isCreateDialogOpen ? "Skapa" : "Spara"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -615,17 +700,21 @@ const UtilityServices: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           {selectedService && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <Box
+              sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+            >
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   Typ av tjänst
                 </Typography>
                 <Box display="flex" alignItems="center" gap={1}>
                   {serviceTypeIcons[selectedService.serviceType]}
-                  <Typography>{serviceTypeLabels[selectedService.serviceType]}</Typography>
+                  <Typography>
+                    {serviceTypeLabels[selectedService.serviceType]}
+                  </Typography>
                 </Box>
               </Box>
-              
+
               {selectedService.description && (
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary">
@@ -634,8 +723,8 @@ const UtilityServices: React.FC = () => {
                   <Typography>{selectedService.description}</Typography>
                 </Box>
               )}
-              
-              <Box sx={{ display: 'flex', gap: 4 }}>
+
+              <Box sx={{ display: "flex", gap: 4 }}>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Mätenhet
@@ -647,31 +736,36 @@ const UtilityServices: React.FC = () => {
                     Pris per enhet
                   </Typography>
                   <Typography>
-                    {selectedService.unitPrice.toLocaleString('sv-SE', {
-                      style: 'currency',
-                      currency: 'SEK',
-                      minimumFractionDigits: 2,
-                    })}
+                    {selectedService.pricing?.[0]?.pricePerUnit?.toLocaleString(
+                      "sv-SE",
+                      {
+                        style: "currency",
+                        currency: "SEK",
+                        minimumFractionDigits: 2,
+                      }
+                    ) || "-"}
                   </Typography>
                 </Box>
               </Box>
-              
+
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   Faktureringsfrekvens
                 </Typography>
-                <Typography>{billingFrequencyLabels[selectedService.billingFrequency]}</Typography>
+                <Typography>
+                  {billingFrequencyLabels[selectedService.billingFrequency]}
+                </Typography>
               </Box>
-              
-              <Box sx={{ display: 'flex', gap: 2 }}>
+
+              <Box sx={{ display: "flex", gap: 2 }}>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Status
                   </Typography>
                   <Box display="flex" gap={1}>
                     <Chip
-                      label={selectedService.isActive ? 'Aktiv' : 'Inaktiv'}
-                      color={selectedService.isActive ? 'success' : 'default'}
+                      label={selectedService.isActive ? "Aktiv" : "Inaktiv"}
+                      color={selectedService.isActive ? "success" : "default"}
                       size="small"
                     />
                     {selectedService.isMandatory && (
@@ -688,16 +782,20 @@ const UtilityServices: React.FC = () => {
                   <Typography variant="subtitle2" color="text.secondary">
                     Antal hushåll
                   </Typography>
-                  <Typography>{selectedService._count?.householdMeters || 0} st</Typography>
+                  <Typography>
+                    {selectedService._count?.householdMeters || 0} st
+                  </Typography>
                 </Box>
               </Box>
-              
+
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   Skapad
                 </Typography>
                 <Typography>
-                  {new Date(selectedService.createdAt).toLocaleDateString('sv-SE')}
+                  {new Date(selectedService.createdAt).toLocaleDateString(
+                    "sv-SE"
+                  )}
                 </Typography>
               </Box>
             </Box>

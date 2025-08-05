@@ -26,7 +26,28 @@ const generateBillsSchema = z.object({
 // GET /api/billing/periods - Get all billing periods
 router.get("/periods", async (req, res, next) => {
   try {
+    const { forMeterReadings } = req.query;
+
+    let whereClause = {};
+
+    // If forMeterReadings=true, only show past periods and current period (not future periods)
+    if (forMeterReadings === "true") {
+      const now = new Date();
+
+      whereClause = {
+        OR: [
+          // Past periods (end date is before today)
+          { endDate: { lt: now } },
+          // Current period (we are in the middle of it)
+          {
+            AND: [{ startDate: { lte: now } }, { endDate: { gte: now } }],
+          },
+        ],
+      };
+    }
+
     const periods = await prisma.billingPeriod.findMany({
+      where: whereClause,
       orderBy: { startDate: "desc" },
       include: {
         _count: {
@@ -802,6 +823,259 @@ router.post("/generate-pdfs", async (req, res, next) => {
       message: `Generated ${successCount} PDFs successfully${
         errorCount > 0 ? `, ${errorCount} failed` : ""
       }`,
+    });
+    return;
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// GET /api/billing/periods/:id/reporting-status - Get reporting status for a billing period
+router.get("/periods/:id/reporting-status", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Get the billing period
+    const billingPeriod = await prisma.billingPeriod.findUnique({
+      where: { id },
+    });
+
+    if (!billingPeriod) {
+      return res.status(404).json({
+        success: false,
+        message: "Billing period not found",
+      });
+    }
+
+    // Get all active households with their meters
+    const households = await prisma.household.findMany({
+      where: { isActive: true },
+      include: {
+        householdMeters: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                serviceType: true,
+              },
+            },
+            readings: {
+              where: { billingPeriodId: id },
+              select: {
+                id: true,
+                meterReading: true,
+                readingDate: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { householdNumber: "asc" },
+    });
+
+    // Calculate reporting status for each household
+    const reportingStatus = households.map((household) => {
+      const meters = household.householdMeters;
+      // Filter out MEMBERSHIP service as it doesn't require meter readings
+      const metersRequiringReadings = meters.filter(
+        (meter) => meter.service.serviceType !== "MEMBERSHIP"
+      );
+      const totalMeters = metersRequiringReadings.length;
+      const reportedMeters = metersRequiringReadings.filter(
+        (meter) => meter.readings.length > 0
+      ).length;
+      const missingServices = metersRequiringReadings
+        .filter((meter) => meter.readings.length === 0)
+        .map((meter) => ({
+          serviceId: meter.service.id,
+          serviceName: meter.service.name,
+          serviceType: meter.service.serviceType,
+        }));
+
+      const reportedServices = metersRequiringReadings
+        .filter((meter) => meter.readings.length > 0)
+        .map((meter) => ({
+          serviceId: meter.service.id,
+          serviceName: meter.service.name,
+          reading: meter.readings[0].meterReading,
+          readingDate: meter.readings[0].readingDate,
+        }));
+
+      return {
+        householdId: household.id,
+        householdNumber: household.householdNumber,
+        ownerName: household.ownerName,
+        totalMeters,
+        reportedMeters,
+        isComplete: reportedMeters === totalMeters && totalMeters > 0,
+        completionPercentage:
+          totalMeters > 0
+            ? Math.round((reportedMeters / totalMeters) * 100)
+            : 0,
+        missingServices,
+        reportedServices,
+      };
+    });
+
+    // Calculate overall statistics
+    const totalHouseholds = households.length;
+    const completeHouseholds = reportingStatus.filter(
+      (h) => h.isComplete
+    ).length;
+    const incompleteHouseholds = totalHouseholds - completeHouseholds;
+    const overallCompletionPercentage =
+      totalHouseholds > 0
+        ? Math.round((completeHouseholds / totalHouseholds) * 100)
+        : 0;
+
+    // Get services that require meter readings (exclude MEMBERSHIP)
+    const allServices = await prisma.utilityService.findMany({
+      where: {
+        serviceType: { not: "MEMBERSHIP" },
+        householdMeters: {
+          some: {
+            household: { isActive: true },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        serviceType: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        billingPeriod: {
+          id: billingPeriod.id,
+          periodName: billingPeriod.periodName,
+          startDate: billingPeriod.startDate,
+          endDate: billingPeriod.endDate,
+          readingDeadline: billingPeriod.readingDeadline,
+        },
+        statistics: {
+          totalHouseholds,
+          completeHouseholds,
+          incompleteHouseholds,
+          overallCompletionPercentage,
+        },
+        households: reportingStatus,
+        availableServices: allServices,
+      },
+    });
+    return;
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// GET /api/billing/check-readiness/:periodId - Check billing readiness (compatibility endpoint)
+router.get("/check-readiness/:periodId", async (req, res, next) => {
+  try {
+    const { periodId } = req.params;
+
+    // Get the billing period
+    const billingPeriod = await prisma.billingPeriod.findUnique({
+      where: { id: periodId },
+    });
+
+    if (!billingPeriod) {
+      return res.status(404).json({
+        success: false,
+        message: "Billing period not found",
+      });
+    }
+
+    // Get all active households with their meters
+    const households = await prisma.household.findMany({
+      where: { isActive: true },
+      include: {
+        householdMeters: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                serviceType: true,
+              },
+            },
+            readings: {
+              where: { billingPeriodId: periodId },
+              select: {
+                id: true,
+                meterReading: true,
+                readingDate: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { householdNumber: "asc" },
+    });
+
+    // Calculate readiness status
+    const householdStatus = households.map((household) => {
+      const meters = household.householdMeters;
+      // Filter out MEMBERSHIP service as it doesn't require meter readings
+      const metersRequiringReadings = meters.filter(
+        (meter) => meter.service.serviceType !== "MEMBERSHIP"
+      );
+      const totalMeters = metersRequiringReadings.length;
+      const reportedMeters = metersRequiringReadings.filter(
+        (meter) => meter.readings.length > 0
+      ).length;
+      const missingServices = metersRequiringReadings
+        .filter((meter) => meter.readings.length === 0)
+        .map((meter) => meter.service.name);
+
+      return {
+        householdId: household.id,
+        householdNumber: household.householdNumber,
+        ownerName: household.ownerName,
+        hasAllReadings: reportedMeters === totalMeters && totalMeters > 0,
+        missingServices,
+        submittedReadings: reportedMeters,
+        totalMeters,
+      };
+    });
+
+    // Calculate overall statistics
+    const totalHouseholds = households.length;
+    const householdsReady = householdStatus.filter(
+      (h) => h.hasAllReadings
+    ).length;
+    const householdsMissingReadings = totalHouseholds - householdsReady;
+    const allReadingsComplete = householdsReady === totalHouseholds;
+
+    // Get households missing readings
+    const missingReadings = householdStatus
+      .filter((h) => !h.hasAllReadings)
+      .map((h) => ({
+        householdNumber: h.householdNumber,
+        ownerName: h.ownerName,
+        missingServices: h.missingServices,
+      }));
+
+    const readinessData = {
+      billingPeriodId: billingPeriod.id,
+      periodName: billingPeriod.periodName,
+      readingDeadline: billingPeriod.readingDeadline.toISOString(),
+      totalHouseholds,
+      householdsReady,
+      householdsMissingReadings,
+      allReadingsComplete,
+      missingReadings,
+      householdStatus,
+    };
+
+    res.json({
+      success: true,
+      data: readinessData,
     });
     return;
   } catch (error) {

@@ -27,6 +27,9 @@ import {
   Download as DownloadIcon,
   Visibility as ViewIcon,
   Payment as PaymentIcon,
+  Add as AddIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
 } from "@mui/icons-material";
 import BillPreview from "../components/BillPreview";
 
@@ -63,10 +66,40 @@ interface QuarterlyBill {
   payments: Payment[];
 }
 
+interface BillingReadiness {
+  billingPeriodId: string;
+  periodName: string;
+  readingDeadline: string;
+  totalHouseholds: number;
+  householdsReady: number;
+  householdsMissingReadings: number;
+  allReadingsComplete: boolean;
+  missingReadings: Array<{
+    householdNumber: number;
+    ownerName: string;
+    missingServices: string[];
+  }>;
+  householdStatus: Array<{
+    householdId: string;
+    householdNumber: number;
+    ownerName: string;
+    hasAllReadings: boolean;
+    missingServices: string[];
+    submittedReadings: number;
+    totalMeters: number;
+  }>;
+}
+
 const Billing: React.FC = () => {
+  // Get current user for role-based access
+  const userString = localStorage.getItem("user");
+  const currentUser = userString ? JSON.parse(userString) : null;
+  const isAdmin = currentUser?.role === "ADMIN";
+
   const [bills, setBills] = useState<QuarterlyBill[]>([]);
   const [periods, setPeriods] = useState<BillingPeriod[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
+  const [readiness, setReadiness] = useState<BillingReadiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +114,12 @@ const Billing: React.FC = () => {
 
   // Bulk operations
   const [bulkPdfLoading, setBulkPdfLoading] = useState(false);
+
+  // Bill generation and readiness
+  const [readinessLoading, setReadinessLoading] = useState(false);
+  const [billGenerationLoading, setBillGenerationLoading] = useState(false);
+  const [selectedPeriodForGeneration, setSelectedPeriodForGeneration] =
+    useState<string>("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -280,6 +319,87 @@ const Billing: React.FC = () => {
     }
   };
 
+  // Check billing readiness for a period
+  const checkBillingReadiness = async (periodId: string) => {
+    if (!periodId) return;
+
+    setReadinessLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/billing/check-readiness/${periodId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte kontrollera faktureringsbereder");
+      }
+
+      const data = await response.json();
+      setReadiness(data.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setReadinessLoading(false);
+    }
+  };
+
+  // Generate bills for a period
+  const generateBills = async (
+    periodId: string,
+    billType: "quarterly" | "monthly"
+  ) => {
+    setBillGenerationLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/billing/generate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          billingPeriodId: periodId,
+          billType,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte generera fakturor");
+      }
+
+      const data = await response.json();
+
+      // Refresh data after successful generation
+      await fetchData();
+
+      // Show success message
+      setError(null);
+      alert(
+        `Framgångsrikt genererade ${data.data.length} ${
+          billType === "quarterly" ? "periodfakturor" : "månadsfakturor"
+        }!`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setBillGenerationLoading(false);
+    }
+  };
+
+  // Handle period selection for generation
+  const handleGenerationPeriodChange = async (event: SelectChangeEvent) => {
+    const periodId = event.target.value;
+    setSelectedPeriodForGeneration(periodId);
+
+    if (periodId) {
+      await checkBillingReadiness(periodId);
+    } else {
+      setReadiness(null);
+    }
+  };
+
   if (loading) {
     return (
       <Box
@@ -307,12 +427,246 @@ const Billing: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          💰 Kvartalsfakturor
+          💰 Periodfakturor
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Hantera och granska kvartalsfakturor för samfällighetsföreningen
+          Hantera och granska periodfakturor för samfällighetsföreningen
+          (4-månaders perioder)
+        </Typography>
+        {/* Debug info - remove in production */}
+        <Typography
+          variant="caption"
+          color="info.main"
+          sx={{ display: "block", mt: 1 }}
+        >
+          Debug: Användarroll = {currentUser?.role || "Ingen"} | isAdmin ={" "}
+          {isAdmin ? "Ja" : "Nej"}
         </Typography>
       </Box>
+
+      {/* Bill Generation Section - Only for admins */}
+      {isAdmin && (
+        <Card
+          sx={{
+            mb: 3,
+            bgcolor: "success.50",
+            border: "2px solid",
+            borderColor: "success.main",
+          }}
+        >
+          <CardContent>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                color: "success.dark",
+              }}
+            >
+              <AddIcon color="success" />
+              🚀 NYTT: Skapa nya fakturor med säkerhetskontroll
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              ⚡ Kontrollera automatiskt att alla hushåll har lämnat in
+              mätaravläsningar innan du skapar fakturor
+            </Typography>
+
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              alignItems={{ xs: "stretch", md: "flex-start" }}
+            >
+              <FormControl sx={{ minWidth: 300 }}>
+                <InputLabel>Välj period för fakturering</InputLabel>
+                <Select
+                  value={selectedPeriodForGeneration}
+                  label="Välj period för fakturering"
+                  onChange={handleGenerationPeriodChange}
+                  disabled={readinessLoading}
+                >
+                  <MenuItem value="">Välj period...</MenuItem>
+                  {periods.map((period) => (
+                    <MenuItem key={period.id} value={period.id}>
+                      {period.periodName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {readinessLoading && <CircularProgress size={24} />}
+            </Stack>
+
+            {/* Readiness Status */}
+            {readiness && (
+              <Box sx={{ mt: 3 }}>
+                <Card
+                  variant="outlined"
+                  sx={{
+                    bgcolor: readiness.allReadingsComplete
+                      ? "success.50"
+                      : "warning.50",
+                  }}
+                >
+                  <CardContent>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={2}
+                      sx={{ mb: 2 }}
+                    >
+                      {readiness.allReadingsComplete ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <WarningIcon color="warning" />
+                      )}
+                      <Box>
+                        <Typography variant="h6">
+                          {readiness.allReadingsComplete
+                            ? "✅ Alla avläsningar kompletta - Redo för fakturering!"
+                            : "⚠️ Avläsningar saknas"}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Period: {readiness.periodName} | Deadline:{" "}
+                          {new Date(
+                            readiness.readingDeadline
+                          ).toLocaleDateString("sv-SE")}
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    <Box
+                      display="grid"
+                      gridTemplateColumns={{ xs: "1fr", sm: "repeat(3, 1fr)" }}
+                      gap={2}
+                      sx={{ mb: 2 }}
+                    >
+                      <Box textAlign="center">
+                        <Typography variant="h4" color="text.primary">
+                          {readiness.householdsReady}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Hushåll klara
+                        </Typography>
+                      </Box>
+                      <Box textAlign="center">
+                        <Typography
+                          variant="h4"
+                          color={
+                            readiness.householdsMissingReadings > 0
+                              ? "warning.main"
+                              : "text.primary"
+                          }
+                        >
+                          {readiness.householdsMissingReadings}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Hushåll saknar avläsningar
+                        </Typography>
+                      </Box>
+                      <Box textAlign="center">
+                        <Typography variant="h4" color="text.primary">
+                          {readiness.totalHouseholds}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Totalt hushåll
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {!readiness.allReadingsComplete &&
+                      readiness.missingReadings.length > 0 && (
+                        <Box>
+                          <Typography
+                            variant="subtitle2"
+                            color="warning.main"
+                            sx={{ mb: 1 }}
+                          >
+                            Hushåll som saknar avläsningar:
+                          </Typography>
+                          <Box sx={{ maxHeight: 200, overflow: "auto" }}>
+                            {readiness.missingReadings.map((missing) => (
+                              <Alert
+                                key={missing.householdNumber}
+                                severity="warning"
+                                sx={{ mb: 1 }}
+                              >
+                                <Typography variant="body2">
+                                  <strong>
+                                    Hushåll {missing.householdNumber}
+                                  </strong>{" "}
+                                  ({missing.ownerName})
+                                  <br />
+                                  Saknar: {missing.missingServices.join(", ")}
+                                </Typography>
+                              </Alert>
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+
+                    {/* Generate Bills Button */}
+                    {readiness.allReadingsComplete && (
+                      <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+                        <IconButton
+                          onClick={() =>
+                            generateBills(
+                              readiness.billingPeriodId,
+                              "quarterly"
+                            )
+                          }
+                          disabled={billGenerationLoading}
+                          sx={{
+                            bgcolor: "success.main",
+                            color: "white",
+                            "&:hover": { bgcolor: "success.dark" },
+                            padding: 2,
+                          }}
+                        >
+                          {billGenerationLoading ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : (
+                            <AddIcon />
+                          )}
+                        </IconButton>
+                        <Box>
+                          <Typography variant="body1">
+                            Generera periodfakturor
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Skapa fakturor för alla {readiness.totalHouseholds}{" "}
+                            hushåll
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                  </CardContent>
+                </Card>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Show info for non-admins */}
+      {!isAdmin && (
+        <Card sx={{ mb: 3, bgcolor: "grey.100" }}>
+          <CardContent>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ color: "text.secondary" }}
+            >
+              ℹ️ Fakturagenerering
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Funktioner för att skapa nya fakturor är endast tillgängliga för
+              administratörer.
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>

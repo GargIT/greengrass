@@ -50,9 +50,9 @@ echo "=== Connection String Suggestions ==="
 CONTAINER_IP=$(docker inspect postgresql --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
 if [ ! -z "$CONTAINER_IP" ]; then
     echo "Container IP: $CONTAINER_IP"
-    echo "Try: postgresql://postrgres_user:postgrespass1!!@${CONTAINER_IP}:5432/grongraset_db"
+    echo "Try: postgresql://postrgres_user:postgrespass1!!@${CONTAINER_IP}:5432/greengrass_db"
 fi
 
-echo "Current: postgresql://postrgres_user:postgrespass1!!@postgresql:5432/grongraset_db"
-echo "Alternative: postgresql://postrgres_user:postgrespass1!!@localhost:5432/grongraset_db"
+echo "Current: postgresql://postrgres_user:postgrespass1!!@postgresql:5432/greengrass_db"
+echo "Alternative: postgresql://postrgres_user:postgrespass1!!@localhost:5432/greengrass_db"
 echo ""

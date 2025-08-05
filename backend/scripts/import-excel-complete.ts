@@ -1,8 +1,123 @@
 import * as XLSX from "xlsx";
-import { PrismaClient } from "@prisma/client";
+import {
+  PrismaClient,
+  BillingFrequency,
+  BillingInterval,
+  PeriodType,
+} from "@prisma/client";
 import { extractPricingHistoryFromExcel } from "./lib/pricing-extractor";
 
 const prisma = new PrismaClient();
+
+function calculateTertiaryPeriod(readingDate: Date): {
+  startDate: Date;
+  endDate: Date;
+  readingDeadline: Date;
+} {
+  const year = readingDate.getFullYear();
+  const month = readingDate.getMonth() + 1; // JavaScript months are 0-based
+
+  let startDate: Date;
+  let endDate: Date;
+
+  if (month >= 1 && month <= 4) {
+    // Period 1: January - April
+    startDate = new Date(year, 0, 1); // January 1
+    endDate = new Date(year, 3, 30); // April 30
+  } else if (month >= 5 && month <= 8) {
+    // Period 2: May - August
+    startDate = new Date(year, 4, 1); // May 1
+    endDate = new Date(year, 7, 31); // August 31
+  } else {
+    // Period 3: September - December
+    startDate = new Date(year, 8, 1); // September 1
+    endDate = new Date(year, 11, 31); // December 31
+  }
+
+  // Reading deadline is 2 weeks before period end
+  const readingDeadline = new Date(endDate);
+  readingDeadline.setDate(endDate.getDate() - 14);
+
+  return { startDate, endDate, readingDeadline };
+}
+
+async function getOrCreateBillingPeriod(readingDate: Date, periodName: string) {
+  // First try to find existing period
+  let billingPeriod = await prisma.billingPeriod.findFirst({
+    where: { periodName },
+  });
+
+  if (billingPeriod) {
+    return billingPeriod;
+  }
+
+  // Get the latest period to chain correctly
+  const latestPeriod = await prisma.billingPeriod.findFirst({
+    orderBy: { endDate: "desc" },
+  });
+
+  let startDate: Date;
+  let endDate: Date;
+
+  if (latestPeriod) {
+    // Chain: start = previous end + 1 day
+    startDate = new Date(latestPeriod.endDate);
+    startDate.setDate(startDate.getDate() + 1);
+
+    // Calculate end date as tertiary period end from the reading date
+    const tertiaryPeriod = calculateTertiaryPeriod(readingDate);
+    endDate = tertiaryPeriod.endDate;
+  } else {
+    // No existing periods, use calculated tertiary period
+    const tertiaryPeriod = calculateTertiaryPeriod(readingDate);
+    startDate = tertiaryPeriod.startDate;
+    endDate = tertiaryPeriod.endDate;
+  }
+
+  // Reading deadline is 2 weeks before period end
+  const readingDeadline = new Date(endDate);
+  readingDeadline.setDate(endDate.getDate() - 14);
+
+  // Create the new period
+  billingPeriod = await prisma.billingPeriod.create({
+    data: {
+      periodName,
+      periodType: PeriodType.tertiary,
+      startDate,
+      endDate,
+      readingDeadline,
+      isOfficialBilling: true,
+      isBillingEnabled: true,
+    },
+  });
+
+  console.log(
+    `  🆕 Created period ${periodName}: ${
+      startDate.toISOString().split("T")[0]
+    } → ${endDate.toISOString().split("T")[0]}`
+  );
+
+  return billingPeriod;
+}
+
+async function findExistingBillingPeriod(
+  readingDate: Date,
+  periodName: string
+) {
+  // Only find existing periods, don't create new ones
+  const billingPeriod = await prisma.billingPeriod.findFirst({
+    where: { periodName },
+  });
+
+  if (!billingPeriod) {
+    console.log(
+      `  ⚠️  No billing period found for ${periodName}, skipping reading`
+    );
+    return null;
+  }
+
+  return billingPeriod;
+}
 
 async function importExcelDataComplete() {
   console.log("🚀 COMPLETE EXCEL IMPORT - Gröngräset Data");
@@ -79,8 +194,12 @@ async function importExcelDataComplete() {
         unit: "m³",
         serviceType: "WATER",
         isActive: true,
+        isMandatory: true,
+        billingFrequency: BillingFrequency.TERTIARY,
+        billingInterval: "TERTIARY" as any,
         hasMainMeters: true,
         mainMeterCount: 2,
+        requiresReadings: true,
         requiresReconciliation: true,
       },
     });
@@ -94,7 +213,11 @@ async function importExcelDataComplete() {
         unit: "kr/kvartal",
         serviceType: "MEMBERSHIP",
         isActive: true,
+        isMandatory: true,
+        billingFrequency: BillingFrequency.TERTIARY,
+        billingInterval: "TERTIARY" as any,
         hasMainMeters: false,
+        requiresReadings: false,
         requiresReconciliation: false,
       },
     });
@@ -173,6 +296,9 @@ async function importExcelDataComplete() {
     console.log(`Reading from: ${excelPath}`);
     const workbook = XLSX.readFile(excelPath);
 
+    // Create billing periods from main meter data FIRST
+    await createBillingPeriodsFromMainMeters(workbook);
+
     // Create main meters
     const mainMeter1 = await prisma.mainMeter.create({
       data: {
@@ -237,11 +363,11 @@ async function importExcelDataComplete() {
         },
       });
 
-      // Parse meter readings
+      // Parse meter readings (skip headers, start from row 5 where data begins)
       const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       let readingsImported = 0;
 
-      for (let i = 0; i < sheetData.length; i++) {
+      for (let i = 4; i < sheetData.length; i++) {
         const row = sheetData[i] as any[];
         if (!row || row.length < 2 || !row[0] || !row[1]) continue;
 
@@ -253,7 +379,21 @@ async function importExcelDataComplete() {
             readingDate = new Date(row[0]);
           }
 
-          if (!readingDate || isNaN(readingDate.getTime())) continue;
+          // Skip invalid dates or dates before year 2000
+          if (
+            !readingDate ||
+            isNaN(readingDate.getTime()) ||
+            readingDate.getFullYear() < 2000
+          ) {
+            if (readingDate && readingDate.getFullYear() < 2000) {
+              console.log(
+                `  ⚠️  Skipping invalid date ${
+                  readingDate.toISOString().split("T")[0]
+                } from row ${i + 1} in ${sheetName}`
+              );
+            }
+            continue;
+          }
 
           const meterReading =
             typeof row[1] === "number" ? row[1] : parseFloat(row[1]);
@@ -262,22 +402,13 @@ async function importExcelDataComplete() {
           const consumption = typeof row[3] === "number" ? row[3] : null;
           const periodName = readingDate.toISOString().split("T")[0];
 
-          let billingPeriod = await prisma.billingPeriod.findFirst({
-            where: { periodName },
-          });
+          const billingPeriod = await findExistingBillingPeriod(
+            readingDate,
+            periodName
+          );
 
           if (!billingPeriod) {
-            billingPeriod = await prisma.billingPeriod.create({
-              data: {
-                periodName,
-                periodType: "quarterly",
-                startDate: readingDate,
-                endDate: readingDate,
-                readingDeadline: readingDate,
-                isOfficialBilling: true,
-                isBillingEnabled: true,
-              },
-            });
+            continue; // Skip readings without matching billing period
           }
 
           await prisma.householdMeterReading.create({
@@ -353,24 +484,18 @@ async function importExcelDataComplete() {
           continue;
         }
 
-        // Find or create billing period
+        // Find existing billing period (should already be created)
         const periodName = readingDate.toISOString().split("T")[0];
-        let billingPeriod = await prisma.billingPeriod.findFirst({
-          where: { periodName },
-        });
+        const billingPeriod = await findExistingBillingPeriod(
+          readingDate,
+          periodName
+        );
 
         if (!billingPeriod) {
-          billingPeriod = await prisma.billingPeriod.create({
-            data: {
-              periodName,
-              periodType: "quarterly",
-              startDate: readingDate,
-              endDate: readingDate,
-              readingDeadline: readingDate,
-              isOfficialBilling: true,
-              isBillingEnabled: true,
-            },
-          });
+          console.log(
+            `  ⚠️  No billing period found for ${periodName}, skipping main meter reading`
+          );
+          continue;
         }
 
         // Create meter reading for Meter 1
@@ -861,6 +986,94 @@ async function importExcelDataComplete() {
   } finally {
     await prisma.$disconnect();
   }
+}
+
+async function createBillingPeriodsFromMainMeters(workbook: any) {
+  console.log("\n📅 Creating billing periods from main meter sheet...\n");
+
+  // Get the main meter sheet
+  const mainMeterSheet = workbook.Sheets["Huvud mätare"];
+  if (!mainMeterSheet) {
+    console.log("❌ 'Huvud mätare' sheet not found");
+    return [];
+  }
+
+  // Convert to array
+  const mainMeterData = XLSX.utils.sheet_to_json(mainMeterSheet, {
+    header: 1,
+  });
+  console.log(`📋 Main meter sheet has ${mainMeterData.length} rows`);
+
+  const readingDates: Date[] = [];
+
+  // Extract all valid reading dates from main meter sheet (skip headers, start from row 5)
+  for (let i = 4; i < mainMeterData.length; i++) {
+    const row = mainMeterData[i] as any[];
+    if (!row || row.length < 7) continue;
+
+    // Check if this looks like a data row (first column should be Excel date)
+    if (typeof row[0] !== "number") continue;
+
+    try {
+      // Parse date
+      const excelDate = row[0];
+      const readingDate = new Date((excelDate - 25569) * 86400 * 1000);
+
+      // Skip invalid dates or dates before year 2000
+      if (
+        !readingDate ||
+        isNaN(readingDate.getTime()) ||
+        readingDate.getFullYear() < 2000
+      ) {
+        continue;
+      }
+
+      readingDates.push(readingDate);
+    } catch (error) {
+      // Skip invalid rows
+      continue;
+    }
+  }
+
+  // Remove duplicates and sort chronologically
+  const uniqueDates = [
+    ...new Set(readingDates.map((d) => d.toISOString().split("T")[0])),
+  ]
+    .map((dateStr) => new Date(dateStr))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  console.log(
+    `📅 Found ${uniqueDates.length} unique reading dates in main meter sheet`
+  );
+
+  // Create billing periods in chronological order
+  const createdPeriods: any[] = [];
+  for (const readingDate of uniqueDates) {
+    const periodName = readingDate.toISOString().split("T")[0];
+
+    // Check if period already exists
+    const existingPeriod = await prisma.billingPeriod.findFirst({
+      where: { periodName },
+    });
+
+    if (existingPeriod) {
+      console.log(`  ✅ Period ${periodName} already exists`);
+      createdPeriods.push(existingPeriod);
+      continue;
+    }
+
+    // Create new period with proper chaining
+    const billingPeriod = await getOrCreateBillingPeriod(
+      readingDate,
+      periodName
+    );
+    createdPeriods.push(billingPeriod);
+  }
+
+  console.log(
+    `✅ Created/verified ${createdPeriods.length} billing periods from main meter data`
+  );
+  return createdPeriods;
 }
 
 importExcelDataComplete();
