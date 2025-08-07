@@ -24,7 +24,7 @@
 
 ---
 
-## Project Status (August 5, 2025)
+## Project Status (August 7, 2025)
 
 ### ✅ COMPLETED FEATURES
 
@@ -43,15 +43,17 @@
 - ✅ **Utility Services**: Configurable services (Water, Electricity, Gas, etc.)
 - ✅ **Meter Management**: Both household meters and main meters
 - ✅ **Meter Readings**: Full CRUD with consumption calculations
-- ✅ **Billing Periods**: Quarterly and monthly period support
+- ✅ **Billing Periods**: Quarterly period support (monthly billing removed for simplicity)
 - ✅ **Role-based Data Access**: Members only see their own data
 
-#### Complete Billing System ✅ NEW
+#### Complete Billing System ✅ REFINED
 
-- ✅ **Utility Billing Engine**: Water consumption + membership fees
-- ✅ **Historical Data Import**: Complete Excel import with pricing history
-- ✅ **Reconciliation System**: Main vs household meter reconciliation
-- ✅ **Quarterly Bill Generation**: All historical bills with proper breakdown
+- ✅ **Quarterly-Only Billing Engine**: Simplified to quarterly periods only
+- ✅ **Volume-based Billing**: All utility costs based on m³ consumption
+- ✅ **Reconciliation System**: Main vs household meter reconciliation as separate line items
+- ✅ **Historical Data Import**: Complete Excel import with UTC date handling
+- ✅ **PDF Invoice Generation**: Polished output with clear cost breakdowns
+- ✅ **Mark as Paid Functionality**: Admin can mark bills as paid with tracking
 - ✅ **Service Type Management**: MEMBERSHIP as dedicated service type
 - ✅ **Pricing Management**: Historical pricing extracted from Excel
 
@@ -68,7 +70,7 @@
   - **ADMIN**: Full access to all households and main meters
   - **MEMBER**: Simplified view - only their own household meters
 - ✅ **User Management**: Admin interface for user/household linking
-- ✅ **Billing Interface**: Complete billing dashboard with detailed invoice preview ✅ NEW
+- ✅ **Billing Interface**: Complete quarterly billing dashboard with mark-as-paid functionality ✅ REFINED
 
 #### User Experience
 
@@ -76,8 +78,9 @@
 - ✅ **Simplified Member Experience**: Members see "Mina mätaravläsningar"
 - ✅ **Responsive Design**: Works on desktop and mobile
 - ✅ **Error Handling**: Comprehensive error handling and user feedback
-- ✅ **Professional Billing GUI**: Invoice preview with service breakdown ✅ NEW
-- ✅ **Swedish Localization**: Proper currency and date formatting ✅ NEW
+- ✅ **Professional Billing GUI**: Invoice preview with service breakdown ✅ REFINED
+- ✅ **Swedish Localization**: Proper currency and date formatting ✅ REFINED
+- ✅ **Quarterly-Only Focus**: Simplified UI focusing on quarterly billing periods
 
 ### 🏗️ CURRENT ARCHITECTURE
 
@@ -97,7 +100,7 @@
 - **HouseholdMeters**: Individual meters per household per service
 - **MainMeters**: Main meters for reconciliation
 - **MeterReadings**: Both household and main meter readings
-- **BillingPeriods**: Quarterly and monthly billing cycles
+- **BillingPeriods**: Quarterly billing cycles (monthly billing removed)
 
 #### API Endpoints
 
@@ -108,74 +111,94 @@
 - ✅ `/api/household-meters/*` - Household meter management
 - ✅ `/api/main-meters/*` - Main meter management
 - ✅ `/api/meter-readings/*` - Reading management with role restrictions
-- ✅ `/api/billing/*` - Billing periods and quarterly bill details
+- ✅ `/api/billing/*` - Quarterly billing periods and bill details with mark-as-paid functionality
 
 #### 🏗️ CURRENT ARCHITECTURE UPDATES
 
 **Latest Backend Additions:**
 
-- Complete utility billing system with water and membership services
-- Historical data import with pricing extraction
-- Reconciliation algorithms for main vs household meters
-- Quarterly bill generation with detailed breakdown
-- Enhanced billing API with detailed invoice endpoints
+- Complete quarterly-only utility billing system with volume-based calculations
+- Historical data import with UTC date handling and pricing extraction
+- Reconciliation algorithms for main vs household meters as separate line items
+- Quarterly bill generation with detailed breakdown and clear field naming
+- Mark-as-paid functionality with payment tracking
+- Enhanced billing API with mark-as-paid endpoints
 
 **Latest Frontend Additions:**
 
-- Professional billing dashboard with filtering
-- Detailed bill preview dialog with service breakdown
+- Professional quarterly billing dashboard with mark-as-paid functionality
+- Detailed bill preview dialog with service breakdown and reconciliation details
 - Proper handling of membership fees as separate service
 - Swedish currency formatting and date localization
-- Material-UI optimized responsive design
+- Material-UI optimized responsive design focused on quarterly billing
+- Clean removal of monthly billing UI components
 
 ### 🎯 DEVELOPMENT PROGRESS & TODO LIST
 
 #### ✅ RECENTLY COMPLETED (August 2025)
 
-##### 1. � **Complete Billing System Implementation**
+##### 1. 🧹 **Quarterly-Only Billing System Refinement**
 
-- ✅ Added MEMBERSHIP serviceType to Prisma schema
-- ✅ Removed deprecated unitPrice field from UtilityService
-- ✅ Complete Excel data import with historical pricing
+- ✅ Removed all monthly billing logic from backend, frontend, and database
+- ✅ Simplified billing system to focus on quarterly periods only
+- ✅ Refactored field names for clarity (billedAmount, reconciliationCost, etc.)
+- ✅ Ensured all reconciliation adjustments are separate invoice line items
+- ✅ Volume-based billing (m³) for all utility services
+- ✅ UTC date handling to prevent timezone issues in import script
+
+##### 2. 💰 **Complete Quarterly Billing Implementation**
+
+- ✅ Enhanced PATCH endpoint for marking bills as paid
+- ✅ Complete Excel data import with historical pricing and UTC dates
 - ✅ Utility billing calculations for water and membership
 - ✅ Generate quarterly bills with all service types
-- ✅ Reconciliation between main and household meters
-- ✅ All historical bills generated and set to "paid" status
+- ✅ Reconciliation between main and household meters as separate line items
+- ✅ All historical bills generated and payment tracking implemented
 
-##### 2. 🎨 **Frontend Billing Interface**
+##### 3. 🎨 **Refined Frontend Billing Interface**
 
-- ✅ Complete Billing page with bill overview
+- ✅ Complete Billing page with quarterly bill overview only
 - ✅ BillPreview component with detailed invoice breakdown
+- ✅ Mark-as-paid functionality wired up with backend
 - ✅ Separate billing rows for variable and fixed costs
 - ✅ Membership fee as dedicated service type display
-- ✅ Filter and summary functionality
+- ✅ Clean removal of monthly billing UI components
 - ✅ Swedish localization and currency formatting
 
-##### 3. � **Data Management & Import**
+##### 4. 📄 **PDF Invoice Generation & Polish**
 
-- ✅ Pricing history extraction from Excel (pricing-extractor.ts)
-- ✅ Complete import script (import-excel-complete.ts)
-- ✅ Historical water and membership pricing import
-- ✅ Utility billing records for all periods
-- ✅ Cleaned up development artifacts and scripts
+- ✅ Polished PDF invoice output with clear cost breakdowns
+- ✅ Removed meter reading details from PDF for clarity
+- ✅ Clean summary showing only "TOTALT ATT BETALA"
+- ✅ Fixed label colors and formatting for professional appearance
+- ✅ Volume-based billing display in PDF invoices
+
+##### 5. 🗄️ **Database Schema Cleanup**
+
+- ✅ Removed MonthlyBill model and all monthly billing relations
+- ✅ Updated field names for consistency and clarity
+- ✅ Ensured reconciliation data is properly structured
+- ✅ Clean migration handling with Prisma generate and db push
 
 #### High Priority (Next Sprint)
 
-##### 1. 🔍 **System Testing & Quality**
+##### 2. � **Enhanced Reports & Analytics**
 
 - [ ] End-to-end testing of complete billing flow
 - [ ] Test all role-based access controls
 - [ ] Validate billing calculations with Excel data
 - [ ] Performance testing with full dataset
-- [ ] Error handling improvements
+- [ ] Advanced consumption reports per household
+- [ ] Cost analysis and trends visualization
+- [ ] Reconciliation reports (main vs household meters)
+- [ ] Financial statements and export functionality
 
-##### 2. 📄 **Invoice Features**
+##### 3. 🔔 **Notifications & Communication**
 
-- [ ] PDF invoice generation
-- [ ] Invoice printing functionality
-- [ ] Email invoice delivery
-- [ ] Invoice templates and customization
-- [ ] Payment status management
+- [ ] Email invoice delivery system
+- [ ] Payment reminder notifications
+- [ ] Meter reading deadline reminders
+- [ ] System status notifications for administrators
 
 ##### 3. 📈 **Reports & Analytics Dashboard**
 
@@ -568,13 +591,14 @@ Database (PostgreSQL)
 
 ### Phase 3: Financial Features ✅ COMPLETED (August 2025)
 
-- ✅ Implement complete billing calculation logic
-- ✅ Build automatic bill generation (quarterly + monthly)
-- ✅ Create reconciliation algorithms (main vs household meters)
-- ✅ Add utility billing with membership service integration
+- ✅ Implement complete quarterly billing calculation logic
+- ✅ Build automatic quarterly bill generation with mark-as-paid functionality
+- ✅ Create reconciliation algorithms (main vs household meters) as separate line items
+- ✅ Add volume-based utility billing with membership service integration
 - ✅ Implement shared costs allocation framework
-- ✅ Build quarterly bill reporting system
-- ✅ Add historical data import and pricing management
+- ✅ Build quarterly bill reporting system with PDF generation
+- ✅ Add historical data import and pricing management with UTC date handling
+- ✅ Polish PDF invoice output for professional appearance
 
 ### Phase 4: Advanced Features (CURRENT PHASE)
 

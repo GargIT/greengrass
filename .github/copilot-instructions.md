@@ -71,9 +71,9 @@ const validatedData = schema.parse(req.body); // Throws ZodError on failure
 ### Billing System Architecture
 
 - **Quarterly Bills**: Official billing periods with member fees (1000 SEK/quarter) + utilities + shared costs
-- **Monthly Bills**: Optional utility-only billing between quarters
 - **Service Types**: `WATER|ELECTRICITY|HEATING|INTERNET|MEMBERSHIP|OTHER`
 - **Reconciliation**: Main meters vs household meters for services like water
+- **Volume-based Billing**: All utility costs based on volume (m³) with reconciliation adjustments as separate line items
 
 ### Database Relationships
 
@@ -180,10 +180,11 @@ import { prisma } from "../lib/prisma";
 ## Current Development Status
 
 - ✅ Complete backend API with role-based access
-- ✅ Full billing system with quarterly/monthly periods
+- ✅ Full quarterly billing system (monthly billing removed for simplicity)
 - ✅ Member vs Admin UI differences implemented
 - ✅ Historical data import from Excel completed
-- 🔲 PDF invoice generation (next priority)
+- ✅ PDF invoice generation with polished output
+- ✅ Mark bills as paid functionality
 - 🔲 Email notifications system
 - 🔲 Advanced reporting dashboard
 
