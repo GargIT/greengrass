@@ -54,7 +54,7 @@ interface Payment {
   paymentMethod: string;
 }
 
-interface QuarterlyBill {
+interface Invoice {
   id: string;
   totalUtilityCosts: number;
   memberFee: number;
@@ -97,7 +97,7 @@ const Billing: React.FC = () => {
   const currentUser = userString ? JSON.parse(userString) : null;
   const isAdmin = currentUser?.role === "ADMIN";
 
-  const [bills, setBills] = useState<QuarterlyBill[]>([]);
+  const [bills, setBills] = useState<Invoice[]>([]);
   const [periods, setPeriods] = useState<BillingPeriod[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [readiness, setReadiness] = useState<BillingReadiness | null>(null);
@@ -158,21 +158,16 @@ const Billing: React.FC = () => {
   const handleMarkAsPaid = async (billId: string) => {
     try {
       const token = localStorage.getItem("accessToken");
-      const response = await fetch(
-        `/api/billing/quarterly/${billId}/mark-paid`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            paymentDate: new Date().toISOString().split("T")[0],
-            paymentMethod: "manual",
-            notes: "Markerad som betald via admin-gränssnitt",
-          }),
-        }
-      );
+      const response = await fetch(`/api/invoices/${billId}/status`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "paid",
+        }),
+      });
 
       if (!response.ok) {
         throw new Error("Kunde inte markera fakturan som betald");
@@ -200,7 +195,7 @@ const Billing: React.FC = () => {
   const handleDownloadPdf = async (billId: string, householdNumber: number) => {
     try {
       const token = localStorage.getItem("accessToken");
-      const response = await fetch(`/api/billing/quarterly/${billId}/pdf`, {
+      const response = await fetch(`/api/invoices/${billId}/pdf`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -386,10 +381,7 @@ const Billing: React.FC = () => {
       };
 
       // Fetch bills
-      const billsUrl = new URL(
-        "/api/billing/quarterly",
-        window.location.origin
-      );
+      const billsUrl = new URL("/api/invoices", window.location.origin);
       if (selectedPeriod) billsUrl.searchParams.set("periodId", selectedPeriod);
       if (selectedHousehold)
         billsUrl.searchParams.set("householdId", selectedHousehold);
@@ -532,7 +524,7 @@ const Billing: React.FC = () => {
   };
 
   // Generate bills for a period
-  const generateBills = async (periodId: string, billType: "quarterly") => {
+  const generateBills = async (periodId: string) => {
     setBillGenerationLoading(true);
     try {
       const token = localStorage.getItem("accessToken");
@@ -544,7 +536,6 @@ const Billing: React.FC = () => {
         },
         body: JSON.stringify({
           billingPeriodId: periodId,
-          billType,
         }),
       });
 
@@ -563,11 +554,7 @@ const Billing: React.FC = () => {
 
       // Show success message
       setError(null);
-      alert(
-        `Framgångsrikt genererade ${data.data.length} ${
-          billType === "quarterly" ? "periodfakturor" : "månadsfakturor"
-        }!`
-      );
+      alert(`Framgångsrikt genererade ${data.data.length} fakturor!`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ett fel uppstod");
     } finally {
@@ -609,20 +596,19 @@ const Billing: React.FC = () => {
       const {
         totalDeleted,
         periodName,
-        deletedQuarterlyBills,
+        deletedInvoices,
         deletedUtilityBilling,
         deletedUtilityReconciliation,
       } = data.data;
 
       let message = `Framgångsrikt borttagna ${totalDeleted} poster för period ${periodName}!`;
       if (
-        deletedQuarterlyBills > 0 ||
+        deletedInvoices > 0 ||
         deletedUtilityBilling > 0 ||
         deletedUtilityReconciliation > 0
       ) {
         message += `\n\nDetaljer:`;
-        if (deletedQuarterlyBills > 0)
-          message += `\n• ${deletedQuarterlyBills} periodfakturor`;
+        if (deletedInvoices > 0) message += `\n• ${deletedInvoices} fakturor`;
         if (deletedUtilityBilling > 0)
           message += `\n• ${deletedUtilityBilling} faktureringsposter`;
         if (deletedUtilityReconciliation > 0)
@@ -872,10 +858,7 @@ const Billing: React.FC = () => {
                           <Stack direction="row" spacing={2}>
                             <IconButton
                               onClick={() =>
-                                generateBills(
-                                  readiness.billingPeriodId,
-                                  "quarterly"
-                                )
+                                generateBills(readiness.billingPeriodId)
                               }
                               disabled={billGenerationLoading}
                               sx={{

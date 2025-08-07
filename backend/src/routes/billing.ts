@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { PDFGenerator } from "../lib/pdfGenerator";
@@ -175,7 +175,7 @@ async function generateReconciliationRecords(billingPeriodId: string) {
 // Validation schemas
 const billingPeriodSchema = z.object({
   periodName: z.string().min(1).max(100),
-  periodType: z.enum(["quarterly", "monthly"]),
+  periodType: z.enum(["tertiary", "monthly"]),
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   readingDeadline: z.string().datetime(),
@@ -187,7 +187,6 @@ const billingPeriodSchema = z.object({
 const generateBillsSchema = z.object({
   billingPeriodId: z.string().uuid(),
   householdIds: z.array(z.string().uuid()).optional(),
-  billType: z.enum(["quarterly"]),
 });
 
 // GET /api/billing/periods - Get all billing periods
@@ -219,7 +218,7 @@ router.get("/periods", async (req, res, next) => {
       include: {
         _count: {
           select: {
-            quarterlyBills: true,
+            invoices: true,
             householdMeterReadings: true,
             mainMeterReadings: true,
           },
@@ -244,10 +243,14 @@ router.post("/periods", async (req, res, next) => {
 
     const period = await prisma.billingPeriod.create({
       data: {
-        ...validatedData,
+        periodName: validatedData.periodName,
+        periodType: validatedData.periodType,
         startDate: new Date(validatedData.startDate),
         endDate: new Date(validatedData.endDate),
         readingDeadline: new Date(validatedData.readingDeadline),
+        isOfficialBilling: validatedData.isOfficialBilling,
+        isBillingEnabled: validatedData.isBillingEnabled,
+        isReconciliationEnabled: validatedData.isReconciliationEnabled,
       },
     });
 
@@ -261,12 +264,12 @@ router.post("/periods", async (req, res, next) => {
   }
 });
 
-// GET /api/billing/quarterly - Get quarterly bills
+// GET /api/billing/quarterly - Get invoices (legacy endpoint)
 router.get("/quarterly", async (req, res, next) => {
   try {
     const { householdId, periodId } = req.query;
 
-    const bills = await prisma.quarterlyBill.findMany({
+    const bills = await prisma.invoice.findMany({
       where: {
         ...(householdId && { householdId: householdId as string }),
         ...(periodId && { billingPeriodId: periodId as string }),
@@ -308,8 +311,9 @@ router.get("/quarterly", async (req, res, next) => {
 // POST /api/billing/generate - Generate bills for a billing period
 router.post("/generate", async (req, res, next) => {
   try {
-    const { billingPeriodId, householdIds, billType } =
-      generateBillsSchema.parse(req.body);
+    const { billingPeriodId, householdIds } = generateBillsSchema.parse(
+      req.body
+    );
 
     // Get billing period
     const billingPeriod = await prisma.billingPeriod.findUnique({
@@ -653,7 +657,7 @@ router.post("/generate", async (req, res, next) => {
       }
       const totalAmount = totalUtilityCosts + totalSharedCosts + memberFee;
 
-      const bill = await prisma.quarterlyBill.create({
+      const bill = await prisma.invoice.create({
         data: {
           householdId: household.id,
           billingPeriodId,
@@ -676,7 +680,7 @@ router.post("/generate", async (req, res, next) => {
     return res.status(201).json({
       success: true,
       data: bills,
-      message: `Generated ${bills.length} quarterly bills`,
+      message: `Generated ${bills.length} invoices`,
     });
   } catch (error) {
     next(error);
@@ -757,7 +761,7 @@ router.get("/quarterly/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const bill = await prisma.quarterlyBill.findUnique({
+    const bill = await prisma.invoice.findUnique({
       where: { id },
       include: {
         household: {
@@ -853,7 +857,7 @@ router.get("/quarterly/:id/pdf", async (req, res, next) => {
     const { id } = req.params;
 
     // Validate that the bill exists and user has access
-    const bill = await prisma.quarterlyBill.findUnique({
+    const bill = await prisma.invoice.findUnique({
       where: { id },
       include: {
         household: true,
@@ -880,7 +884,7 @@ router.get("/quarterly/:id/pdf", async (req, res, next) => {
     }
 
     // Generate PDF
-    const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(id);
+    const pdfBuffer = await PDFGenerator.generateInvoicePDF(id);
 
     // Set response headers for PDF download
     const billNumber = `${new Date(bill.createdAt).getFullYear()}${(
@@ -909,11 +913,11 @@ router.get("/quarterly/:id/pdf", async (req, res, next) => {
 router.post("/generate-pdfs", async (req, res, next) => {
   try {
     const schema = z.object({
-      quarterlyBillIds: z.array(z.string().uuid()).optional(),
+      invoiceIds: z.array(z.string().uuid()).optional(),
       billingPeriodId: z.string().uuid().optional(),
     });
 
-    const { quarterlyBillIds, billingPeriodId } = schema.parse(req.body);
+    const { invoiceIds, billingPeriodId } = schema.parse(req.body);
 
     if (req.user?.role !== "ADMIN") {
       return res.status(403).json({
@@ -925,10 +929,10 @@ router.post("/generate-pdfs", async (req, res, next) => {
     const results = [];
 
     // Generate PDFs for quarterly bills
-    if (quarterlyBillIds && quarterlyBillIds.length > 0) {
-      for (const billId of quarterlyBillIds) {
+    if (invoiceIds && invoiceIds.length > 0) {
+      for (const billId of invoiceIds) {
         try {
-          const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(billId);
+          const pdfBuffer = await PDFGenerator.generateInvoicePDF(billId);
           results.push({
             billId,
             type: "quarterly",
@@ -948,17 +952,15 @@ router.post("/generate-pdfs", async (req, res, next) => {
 
     // Generate PDFs for all bills in a billing period
     if (billingPeriodId) {
-      const quarterlyBills = await prisma.quarterlyBill.findMany({
+      const invoices = await prisma.invoice.findMany({
         where: { billingPeriodId },
         select: { id: true },
       });
 
       // Process quarterly bills
-      for (const bill of quarterlyBills) {
+      for (const bill of invoices) {
         try {
-          const pdfBuffer = await PDFGenerator.generateQuarterlyBillPDF(
-            bill.id
-          );
+          const pdfBuffer = await PDFGenerator.generateInvoicePDF(bill.id);
           results.push({
             billId: bill.id,
             type: "quarterly",
@@ -1144,116 +1146,6 @@ router.get("/periods/:id/reporting-status", async (req, res, next) => {
   }
 });
 
-// GET /api/billing/check-readiness/:periodId - Check billing readiness (compatibility endpoint)
-router.get("/check-readiness/:periodId", async (req, res, next) => {
-  try {
-    const { periodId } = req.params;
-
-    // Get the billing period
-    const billingPeriod = await prisma.billingPeriod.findUnique({
-      where: { id: periodId },
-    });
-
-    if (!billingPeriod) {
-      return res.status(404).json({
-        success: false,
-        message: "Billing period not found",
-      });
-    }
-
-    // Get all active households with their meters
-    const households = await prisma.household.findMany({
-      where: { isActive: true },
-      include: {
-        householdMeters: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-                serviceType: true,
-              },
-            },
-            readings: {
-              where: { billingPeriodId: periodId },
-              select: {
-                id: true,
-                meterReading: true,
-                readingDate: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { householdNumber: "asc" },
-    });
-
-    // Calculate readiness status
-    const householdStatus = households.map((household) => {
-      const meters = household.householdMeters;
-      // Filter out MEMBERSHIP service as it doesn't require meter readings
-      const metersRequiringReadings = meters.filter(
-        (meter) => meter.service.serviceType !== "MEMBERSHIP"
-      );
-      const totalMeters = metersRequiringReadings.length;
-      const reportedMeters = metersRequiringReadings.filter(
-        (meter) => meter.readings.length > 0
-      ).length;
-      const missingServices = metersRequiringReadings
-        .filter((meter) => meter.readings.length === 0)
-        .map((meter) => meter.service.name);
-
-      return {
-        householdId: household.id,
-        householdNumber: household.householdNumber,
-        ownerName: household.ownerName,
-        hasAllReadings: reportedMeters === totalMeters && totalMeters > 0,
-        missingServices,
-        submittedReadings: reportedMeters,
-        totalMeters,
-      };
-    });
-
-    // Calculate overall statistics
-    const totalHouseholds = households.length;
-    const householdsReady = householdStatus.filter(
-      (h) => h.hasAllReadings
-    ).length;
-    const householdsMissingReadings = totalHouseholds - householdsReady;
-    const allReadingsComplete = householdsReady === totalHouseholds;
-
-    // Get households missing readings
-    const missingReadings = householdStatus
-      .filter((h) => !h.hasAllReadings)
-      .map((h) => ({
-        householdNumber: h.householdNumber,
-        ownerName: h.ownerName,
-        missingServices: h.missingServices,
-      }));
-
-    const readinessData = {
-      billingPeriodId: billingPeriod.id,
-      periodName: billingPeriod.periodName,
-      readingDeadline: billingPeriod.readingDeadline.toISOString(),
-      totalHouseholds,
-      householdsReady,
-      householdsMissingReadings,
-      allReadingsComplete,
-      missingReadings,
-      householdStatus,
-    };
-
-    res.json({
-      success: true,
-      data: readinessData,
-    });
-    return;
-  } catch (error) {
-    next(error);
-    return;
-  }
-});
-
 // DELETE /api/billing/delete-period-bills - Delete all bills and related data for a billing period
 router.delete("/delete-period-bills", async (req, res, next) => {
   try {
@@ -1282,20 +1174,20 @@ router.delete("/delete-period-bills", async (req, res, next) => {
       });
 
       // Delete quarterly bills
-      const deletedQuarterlyBills = await tx.quarterlyBill.deleteMany({
+      const deletedInvoices = await tx.invoice.deleteMany({
         where: { billingPeriodId },
       });
 
       return {
         utilityBillings: deletedUtilityBillings.count,
-        quarterlyBills: deletedQuarterlyBills.count,
+        invoices: deletedInvoices.count,
       };
     });
 
     res.json({
       success: true,
       data: result,
-      message: `Deleted ${result.quarterlyBills} quarterly bills and ${result.utilityBillings} utility billing records`,
+      message: `Deleted ${result.invoices} quarterly bills and ${result.utilityBillings} utility billing records`,
     });
     return;
   } catch (error) {
@@ -1335,7 +1227,7 @@ router.get("/debug/reconciliation-2025", async (req, res, next) => {
     });
 
     // Check existing bills
-    const bills = await prisma.quarterlyBill.findMany({
+    const bills = await prisma.invoice.findMany({
       where: {
         billingPeriodId: period.id,
         householdId: household.id,
@@ -1400,7 +1292,7 @@ router.patch("/quarterly/:billId/mark-paid", async (req, res, next) => {
     const validatedData = schema.parse(req.body);
 
     // Check if bill exists
-    const existingBill = await prisma.quarterlyBill.findUnique({
+    const existingBill = await prisma.invoice.findUnique({
       where: { id: billId },
       include: { household: true },
     });
@@ -1414,7 +1306,7 @@ router.patch("/quarterly/:billId/mark-paid", async (req, res, next) => {
     }
 
     // Update bill status to paid
-    const updatedBill = await prisma.quarterlyBill.update({
+    const updatedBill = await prisma.invoice.update({
       where: { id: billId },
       data: {
         status: "paid",
@@ -1424,7 +1316,7 @@ router.patch("/quarterly/:billId/mark-paid", async (req, res, next) => {
     // Create payment record
     await prisma.payment.create({
       data: {
-        quarterlyBillId: billId,
+        invoiceId: billId,
         amount: Number(existingBill.totalAmount),
         paymentDate: validatedData.paymentDate
           ? new Date(validatedData.paymentDate)

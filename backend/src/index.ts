@@ -17,6 +17,7 @@ import mainMeterRoutes from "./routes/mainMeters";
 import meterReadingRoutes from "./routes/meterReadings";
 import billingRoutes from "./routes/billing";
 import billingAutomationRoutes from "./routes/billingAutomation";
+import invoicesRoutes from "./routes/invoices";
 import reportsRoutes from "./routes/reports";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
@@ -81,6 +82,7 @@ app.use("/api/main-meters", authenticate, mainMeterRoutes);
 app.use("/api/meter-readings", authenticate, meterReadingRoutes);
 app.use("/api/billing", authenticate, billingRoutes);
 app.use("/api/billing", authenticate, billingAutomationRoutes);
+app.use("/api/invoices", authenticate, invoicesRoutes);
 app.use("/api/reports", authenticate, reportsRoutes);
 
 // Error handling middleware (must be last)

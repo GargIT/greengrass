@@ -17,12 +17,12 @@ router.get("/dashboard", async (req, res, next) => {
     });
 
     // Get pending bills count
-    const pendingQuarterlyBills = await prisma.quarterlyBill.count({
+    const pendingInvoices = await prisma.invoice.count({
       where: { status: "pending" },
     });
 
     // Get total revenue for current year
-    const quarterlyRevenue = await prisma.quarterlyBill.aggregate({
+    const invoiceRevenue = await prisma.invoice.aggregate({
       where: {
         createdAt: {
           gte: new Date(currentYear, 0, 1),
@@ -33,7 +33,7 @@ router.get("/dashboard", async (req, res, next) => {
       _sum: {
         totalAmount: true,
       },
-    });    
+    });
 
     // Get active utility services
     const activeServices = await prisma.utilityService.count({
@@ -75,8 +75,8 @@ router.get("/dashboard", async (req, res, next) => {
         overview: {
           totalHouseholds,
           activeServices,
-          pendingBills: pendingQuarterlyBills,
-          totalRevenue: Number(quarterlyRevenue._sum.totalAmount || 0),
+          pendingBills: pendingInvoices,
+          totalRevenue: Number(invoiceRevenue._sum.totalAmount || 0),
         },
         recentReadings,
       },
@@ -190,7 +190,7 @@ router.get("/consumption/:serviceId", async (req, res, next) => {
 router.get("/billing/:periodId", async (req, res, next) => {
   try {
     const { periodId } = req.params;
-    const { type = "quarterly" } = req.query;
+    const { type = "tertiary" } = req.query;
 
     // Get billing period
     const billingPeriod = await prisma.billingPeriod.findUnique({
@@ -204,7 +204,7 @@ router.get("/billing/:periodId", async (req, res, next) => {
       });
     }
 
-    const bills = await prisma.quarterlyBill.findMany({
+    const bills = await prisma.invoice.findMany({
       where: { billingPeriodId: periodId },
       include: {
         household: {
@@ -282,11 +282,11 @@ router.get("/payments", async (req, res, next) => {
           lt: endDate,
         },
         ...(householdId && {
-          OR: [{ quarterlyBill: { householdId: householdId as string } }],
+          OR: [{ invoice: { householdId: householdId as string } }],
         }),
       },
       include: {
-        quarterlyBill: {
+        invoice: {
           include: {
             household: {
               select: {
@@ -311,7 +311,7 @@ router.get("/payments", async (req, res, next) => {
         (sum, payment) => sum + Number(payment.amount),
         0
       ),
-      quarterlyPayments: payments.filter((p) => p.quarterlyBillId).length,
+      invoicePayments: payments.filter((p) => p.invoiceId).length,
     };
 
     res.json({

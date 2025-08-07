@@ -29,7 +29,7 @@ router.get("/", async (req, res, next) => {
       include: {
         _count: {
           select: {
-            quarterlyBills: true,
+            invoices: true,
           },
         },
       },
@@ -62,7 +62,7 @@ router.get("/:id", async (req, res, next) => {
             },
           },
         },
-        quarterlyBills: {
+        invoices: {
           take: 10,
           orderBy: { createdAt: "desc" },
         },

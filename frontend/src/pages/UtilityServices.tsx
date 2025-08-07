@@ -53,13 +53,8 @@ interface UtilityService {
   isActive: boolean;
   isMandatory: boolean;
   requiresReadings?: boolean;
-  billingFrequency: "MONTHLY" | "QUARTERLY" | "TERTIARY" | "ANNUALLY";
-  billingInterval?:
-    | "MONTHLY"
-    | "QUARTERLY"
-    | "TERTIARY"
-    | "BIANNUALLY"
-    | "ANNUALLY";
+  billingFrequency: "MONTHLY" | "TERTIARY" | "ANNUALLY";
+  billingInterval?: "MONTHLY" | "TERTIARY" | "BIANNUALLY" | "ANNUALLY";
   createdAt: string;
   _count?: {
     mainMeters: number;
@@ -106,7 +101,6 @@ const serviceTypeLabels = {
 
 const billingFrequencyLabels = {
   MONTHLY: "Månatlig",
-  QUARTERLY: "Kvartalsvis",
   TERTIARY: "Tertial (var 4:e månad)",
   ANNUALLY: "Årlig",
 };

@@ -4,17 +4,10 @@ import { z } from "zod";
 
 const router = Router();
 
-// Validation schemas
-const generateBillsSchema = z.object({
-  billingPeriodId: z.string().uuid(),
-  billType: z.enum(["quarterly", "monthly"]),
-  force: z.boolean().optional().default(false), // Admin override to generate bills even if readings incomplete
-});
-
-// GET /api/billing/check-readiness/:billingPeriodId - Check if all households have submitted readings
-router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
+// GET /api/billing/check-readiness/:periodId - Check if all households have submitted readings
+router.get("/check-readiness/:periodId", async (req, res, next) => {
   try {
-    const { billingPeriodId } = req.params;
+    const { periodId } = req.params;
 
     // Only admins can check billing readiness
     if (req.user?.role !== "ADMIN") {
@@ -26,7 +19,7 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
 
     // Get billing period
     const billingPeriod = await prisma.billingPeriod.findUnique({
-      where: { id: billingPeriodId },
+      where: { id: periodId },
     });
 
     if (!billingPeriod) {
@@ -45,7 +38,7 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
             service: true,
             readings: {
               where: {
-                billingPeriodId: billingPeriodId,
+                billingPeriodId: periodId,
               },
             },
           },
@@ -56,7 +49,7 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
 
     // Check which households are missing readings
     const readinessData = {
-      billingPeriodId,
+      billingPeriodId: periodId,
       periodName: billingPeriod.periodName,
       readingDeadline: billingPeriod.readingDeadline,
       totalHouseholds: activeHouseholds.length,
@@ -68,6 +61,11 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
     };
 
     for (const household of activeHouseholds) {
+      // Filter out MEMBERSHIP service as it doesn't require meter readings
+      const metersRequiringReadings = household.householdMeters.filter(
+        (meter) => meter.service.serviceType !== "MEMBERSHIP"
+      );
+
       const householdStatus = {
         householdId: household.id,
         householdNumber: household.householdNumber,
@@ -75,11 +73,11 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
         hasAllReadings: true,
         missingServices: [] as string[],
         submittedReadings: 0,
-        totalMeters: household.householdMeters.length,
+        totalMeters: metersRequiringReadings.length,
       };
 
-      // Check each meter for this household
-      for (const meter of household.householdMeters) {
+      // Check each meter for this household (excluding MEMBERSHIP)
+      for (const meter of metersRequiringReadings) {
         const hasReading = meter.readings.length > 0;
         householdStatus.submittedReadings += hasReading ? 1 : 0;
 
@@ -88,6 +86,10 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
           householdStatus.missingServices.push(meter.service.name);
         }
       }
+
+      // Only consider household ready if it has meters requiring readings
+      householdStatus.hasAllReadings =
+        householdStatus.hasAllReadings && metersRequiringReadings.length > 0;
 
       if (householdStatus.hasAllReadings) {
         readinessData.householdsReady++;

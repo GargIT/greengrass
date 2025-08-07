@@ -42,7 +42,7 @@ interface Household {
   isActive: boolean;
   createdAt: string;
   _count?: {
-    quarterlyBills: number;
+    invoices: number;
     monthlyBills: number;
   };
 }
@@ -621,7 +621,7 @@ const Households: React.FC = () => {
                       Kvartalsfakturor
                     </Typography>
                     <Typography>
-                      {selectedHousehold._count.quarterlyBills} st
+                      {selectedHousehold._count.invoices} st
                     </Typography>
                   </Box>
                   <Box sx={{ flex: 1 }}>

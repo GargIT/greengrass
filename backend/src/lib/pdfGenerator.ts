@@ -1,5 +1,5 @@
 import puppeteer, { Browser } from "puppeteer";
-import path from "path";
+import * as path from "path";
 import { prisma } from "./prisma";
 
 export interface BillData {
@@ -27,7 +27,6 @@ export interface BillData {
     variableCost: number;
     totalCost: number;
     meterReading: number;
-    previousReading: number;
   }>;
 }
 
@@ -77,30 +76,74 @@ export class PDFGenerator {
   }
 
   /**
-   * Generate PDF invoice for a quarterly bill
+   * Generate PDF invoice for an invoice with utility details
    */
-  public static async generateQuarterlyBillPDF(
-    billId: string
-  ): Promise<Buffer> {
+  public static async generateInvoicePDFWithDetails(params: {
+    invoice: any;
+    utilityDetails: any[];
+  }): Promise<Buffer> {
     try {
-      // Fetch bill data with all relations
-      const bill = await prisma.quarterlyBill.findUnique({
-        where: { id: billId },
+      const { invoice, utilityDetails } = params;
+
+      // Format data for template
+      const billData: BillData = {
+        id: invoice.id,
+        billNumber: this.generateBillNumber(invoice),
+        householdNumber: invoice.household.householdNumber,
+        householdOwner: invoice.household.ownerName,
+        householdAddress: invoice.household.address || "Gröngräset",
+        billingPeriodName: invoice.billingPeriod.periodName,
+        startDate: invoice.billingPeriod.startDate,
+        endDate: invoice.billingPeriod.endDate,
+        dueDate: invoice.dueDate,
+        memberFee: Number(invoice.memberFee),
+        totalUtilityCosts: Number(invoice.totalUtilityCosts),
+        sharedCosts: Number(invoice.sharedCosts),
+        totalAmount: Number(invoice.totalAmount),
+        status: invoice.status,
+        utilityBillings: utilityDetails.map((ub) => ({
+          serviceName: ub.service.name,
+          serviceType: ub.service.serviceType || "OTHER",
+          consumption: Number(ub.consumption),
+          unit: ub.service.unit,
+          pricePerUnit: Number(ub.costPerUnit),
+          fixedFee: Number(ub.fixedCost),
+          variableCost: Number(ub.consumptionCost),
+          totalCost: Number(ub.totalUtilityCost),
+          meterReading: Number(ub.consumption), // Using consumption as meter reading
+        })),
+      };
+
+      return await this.generatePDF(billData);
+    } catch (error) {
+      console.error("Error generating invoice PDF:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate PDF invoice for an invoice
+   */
+  public static async generateInvoicePDF(invoiceId: string): Promise<Buffer> {
+    try {
+      // Fetch invoice data with all relations
+      const invoice = await prisma.invoice.findUnique({
+        where: { id: invoiceId },
         include: {
           household: true,
           billingPeriod: true,
         },
       });
 
-      if (!bill) {
-        throw new Error("Quarterly bill not found");
+      if (!invoice) {
+        throw new Error("Invoice not found");
       }
 
       // Get detailed utility billing breakdown
       const utilityBillings = await prisma.utilityBilling.findMany({
         where: {
-          householdId: bill.householdId,
-          billingPeriodId: bill.billingPeriodId,
+          householdId: invoice.householdId,
+          billingPeriodId: invoice.billingPeriodId,
         },
         include: {
           service: true,
@@ -112,20 +155,20 @@ export class PDFGenerator {
 
       // Format data for template
       const billData: BillData = {
-        id: bill.id,
-        billNumber: this.generateBillNumber(bill),
-        householdNumber: bill.household.householdNumber,
-        householdOwner: bill.household.ownerName,
-        householdAddress: bill.household.address || "Gröngräset",
-        billingPeriodName: bill.billingPeriod.periodName,
-        startDate: bill.billingPeriod.startDate,
-        endDate: bill.billingPeriod.endDate,
-        dueDate: bill.dueDate,
-        memberFee: Number(bill.memberFee),
-        totalUtilityCosts: Number(bill.totalUtilityCosts),
-        sharedCosts: Number(bill.sharedCosts),
-        totalAmount: Number(bill.totalAmount),
-        status: bill.status,
+        id: invoice.id,
+        billNumber: this.generateBillNumber(invoice),
+        householdNumber: invoice.household.householdNumber,
+        householdOwner: invoice.household.ownerName,
+        householdAddress: invoice.household.address || "Gröngräset",
+        billingPeriodName: invoice.billingPeriod.periodName,
+        startDate: invoice.billingPeriod.startDate,
+        endDate: invoice.billingPeriod.endDate,
+        dueDate: invoice.dueDate,
+        memberFee: Number(invoice.memberFee),
+        totalUtilityCosts: Number(invoice.totalUtilityCosts),
+        sharedCosts: Number(invoice.sharedCosts),
+        totalAmount: Number(invoice.totalAmount),
+        status: invoice.status,
         utilityBillings: utilityBillings.map((ub) => ({
           serviceName: ub.service.name,
           serviceType: ub.service.serviceType,
@@ -136,13 +179,12 @@ export class PDFGenerator {
           variableCost: Number(ub.consumptionCost),
           totalCost: Number(ub.totalUtilityCost),
           meterReading: Number(ub.consumption), // Using consumption as meter reading
-          previousReading: 0, // Simplified - not calculated anymore
         })),
       };
 
-      return await this.generatePDF(billData, "quarterly");
+      return await this.generatePDF(billData);
     } catch (error) {
-      console.error("Error generating quarterly bill PDF:", error);
+      console.error("Error generating invoice PDF:", error);
       throw error;
     }
   }
@@ -150,16 +192,13 @@ export class PDFGenerator {
   /**
    * Generate the actual PDF using Puppeteer
    */
-  private static async generatePDF(
-    billData: BillData,
-    billType: "quarterly"
-  ): Promise<Buffer> {
+  private static async generatePDF(billData: BillData): Promise<Buffer> {
     const browser = await this.getBrowser();
     const page = await browser.newPage();
 
     try {
       // Generate HTML content
-      const htmlContent = this.generateInvoiceHTML(billData, billType);
+      const htmlContent = this.generateInvoiceHTML(billData);
 
       // Set page content
       await page.setContent(htmlContent, { waitUntil: "networkidle0" });
@@ -185,10 +224,7 @@ export class PDFGenerator {
   /**
    * Generate HTML template for invoice
    */
-  private static generateInvoiceHTML(
-    billData: BillData,
-    billType: "quarterly"
-  ): string {
+  private static generateInvoiceHTML(billData: BillData): string {
     const formatCurrency = (amount: number) =>
       new Intl.NumberFormat("sv-SE", {
         style: "currency",
@@ -454,11 +490,6 @@ export class PDFGenerator {
                 <p>${formatDate(billData.startDate)} - ${formatDate(
       billData.endDate
     )}</p>
-                <p><strong>Typ:</strong> ${
-                  billType === "quarterly"
-                    ? "Kvartalsdebitering"
-                    : "Månadsdebitering"
-                }</p>
             </div>
         </div>
         

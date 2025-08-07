@@ -18,7 +18,7 @@ model Household {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at")
   householdMeters HouseholdMeter[]
-  quarterlyBills  QuarterlyBill[]
+  invoices        Invoice[]
   users           User[]
   utilityBilling  UtilityBilling[]
 
@@ -124,7 +124,7 @@ model BillingPeriod {
   createdAt               DateTime                @default(now()) @map("created_at")
   householdMeterReadings  HouseholdMeterReading[]
   mainMeterReadings       MainMeterReading[]
-  quarterlyBills          QuarterlyBill[]
+  invoices                Invoice[]
   utilityBilling          UtilityBilling[]
   reconciliations         UtilityReconciliation[]
 
@@ -186,7 +186,7 @@ model UtilityBilling {
   @@map("utility_billing")
 }
 
-model QuarterlyBill {
+model Invoice {
   id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   householdId       String        @map("household_id") @db.Uuid
   billingPeriodId   String        @map("billing_period_id") @db.Uuid
@@ -201,19 +201,19 @@ model QuarterlyBill {
   billingPeriod     BillingPeriod @relation(fields: [billingPeriodId], references: [id])
   household         Household     @relation(fields: [householdId], references: [id])
 
-  @@map("quarterly_bills")
+  @@map("invoices")
 }
 
 model Payment {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  quarterlyBillId String?        @map("quarterly_bill_id") @db.Uuid
-  amount          Decimal        @db.Decimal(8, 2)
-  paymentDate     DateTime       @map("payment_date") @db.Date
-  paymentMethod   String?        @map("payment_method") @db.VarChar(50)
-  referenceNumber String?        @map("reference_number") @db.VarChar(100)
-  notes           String?        @db.VarChar(500)
-  createdAt       DateTime       @default(now()) @map("created_at")
-  quarterlyBill   QuarterlyBill? @relation(fields: [quarterlyBillId], references: [id])
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId       String?   @map("invoice_id") @db.Uuid
+  amount          Decimal   @db.Decimal(8, 2)
+  paymentDate     DateTime  @map("payment_date") @db.Date
+  paymentMethod   String?   @map("payment_method") @db.VarChar(50)
+  referenceNumber String?   @map("reference_number") @db.VarChar(100)
+  notes           String?   @db.VarChar(500)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  invoice         Invoice?  @relation(fields: [invoiceId], references: [id])
 
   @@map("payments")
 }
@@ -263,9 +263,8 @@ model RefreshToken {
 }
 
 enum PeriodType {
-  quarterly
-  monthly
   tertiary      // 3 times per year (every 4 months)
+  monthly
 
   @@map("period_type")
 }

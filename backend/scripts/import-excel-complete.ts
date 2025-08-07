@@ -154,8 +154,8 @@ async function importExcelDataComplete() {
     await prisma.payment.deleteMany({});
     console.log("✅ Cleared payments");
 
-    await prisma.quarterlyBill.deleteMany({});
-    console.log("✅ Cleared quarterly bills");
+    await prisma.invoice.deleteMany({});
+    console.log("✅ Cleared invoices");
 
     await prisma.billingPeriod.deleteMany({});
     console.log("✅ Cleared billing periods");
@@ -946,12 +946,12 @@ async function importExcelDataComplete() {
     console.log(`✅ Created ${totalBillsCreated} utility billing records`);
 
     // =================================================================
-    // STEP 7: GENERATE QUARTERLY BILLS
+    // STEP 7: GENERATE INVOICES
     // =================================================================
-    console.log("\n📋 STEP 7: Generating quarterly bills...\n");
+    console.log("\n📋 STEP 7: Generating invoices...\n");
 
-    // Clear existing quarterly bills
-    await prisma.quarterlyBill.deleteMany({});
+    // Clear existing invoices
+    await prisma.invoice.deleteMany({});
 
     const periodsWithBilling = await prisma.billingPeriod.findMany({
       where: {
@@ -962,7 +962,7 @@ async function importExcelDataComplete() {
       orderBy: { periodName: "asc" },
     });
 
-    let quarterlyBillsCreated = 0;
+    let invoicesCreated = 0;
 
     for (const period of periodsWithBilling) {
       const householdsWithBilling = await prisma.household.findMany({
@@ -1002,7 +1002,7 @@ async function importExcelDataComplete() {
           const dueDate = new Date(period.readingDeadline);
           dueDate.setMonth(dueDate.getMonth() + 4);
 
-          await prisma.quarterlyBill.create({
+          await prisma.invoice.create({
             data: {
               householdId: household.id,
               billingPeriodId: period.id,
@@ -1015,12 +1015,12 @@ async function importExcelDataComplete() {
             },
           });
 
-          quarterlyBillsCreated++;
+          invoicesCreated++;
         }
       }
     }
 
-    console.log(`✅ Created ${quarterlyBillsCreated} quarterly bills`);
+    console.log(`✅ Created ${invoicesCreated} invoices`);
 
     // =================================================================
     // FINAL SUMMARY

@@ -31,7 +31,7 @@ import {
 interface BillingPeriod {
   id: string;
   periodName: string;
-  periodType: "quarterly" | "monthly";
+  periodType: "tertiary" | "monthly";
   startDate: string;
   endDate: string;
   readingDeadline: string;
