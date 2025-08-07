@@ -6,35 +6,36 @@ A modern web application for managing utility billing for Swedish samfällighets
 
 This system replaces an Excel-based utility billing system with a comprehensive web application that supports:
 
-- **Dynamic household management** with automatically calculated ownership ratios (andelstal)
-- Equal share distribution: each active household gets 1/N share where N = total active households
-- Quarterly mandatory meter readings (every 4th month)
-- Optional monthly readings with optional monthly billing
-- Multiple utility services (water, electricity, heating, internet, etc.)
-- Both variable (consumption-based) and fixed fees
-- Meter reconciliation between main meters and household meters
-- Flexible billing periods and frequencies
-- Shared costs and member fees
-- Payment tracking
+- **Dynamic household management** - 14 households with equal shares, simplified ownership model without andelstal calculations
+- **Quarterly billing system** - streamlined to focus on 4-month billing periods only
+- **Volume-based utility billing** - all costs calculated based on consumption (m³)
+- **Multiple utility services** - water, electricity, heating, internet, membership fees
+- **Reconciliation system** - main meters vs household meters with adjustments as separate line items
+- **Role-based access** - ADMIN (full access) vs MEMBER (own household only)
+- **Professional invoice generation** - PDF invoices with detailed cost breakdowns
+- **Payment tracking** - mark bills as paid with full audit trail
+- **Swedish localization** - proper currency formatting and Swedish terminology
 
 ## Technology Stack
 
 ### Backend
+
 - **Node.js** with **Express.js** - REST API server
 - **Prisma** - Database ORM and migration tool
 - **PostgreSQL** - Primary database
 - **TypeScript** - Type-safe development
 - **Zod** - Runtime type validation
-- **JWT** - Authentication (to be implemented)
+- **JWT** - Authentication with refresh tokens
+- **Puppeteer** - PDF generation for invoices
 
 ### Frontend
+
 - **React** with **TypeScript** - User interface
 - **Vite** - Build tool and development server
 - **Material-UI (MUI)** - Component library
 - **React Router** - Client-side routing
-- **Axios** - HTTP client
-- **Date-fns** - Date manipulation
-- **Recharts** - Charts and visualizations
+- **Date-fns** - Date manipulation with Swedish localization
+- **Role-based routing** - Different interfaces for ADMIN vs MEMBER users
 
 ## Project Structure
 
@@ -42,26 +43,36 @@ This system replaces an Excel-based utility billing system with a comprehensive 
 greengrass/
 ├── backend/                 # Node.js/Express API server
 │   ├── prisma/
-│   │   ├── schema.prisma   # Database schema
+│   │   ├── schema.prisma   # Database schema (quarterly billing only)
 │   │   └── seed.ts         # Initial data seeding
+│   ├── scripts/            # Utility scripts
+│   │   ├── import-excel-complete.ts  # Excel data import
+│   │   └── reset-data.ts   # Database reset utility
 │   ├── src/
 │   │   ├── index.ts        # Main server file
 │   │   ├── lib/
-│   │   │   └── prisma.ts   # Prisma client setup
-│   │   ├── middleware/     # Express middleware
+│   │   │   ├── prisma.ts   # Prisma client setup
+│   │   │   ├── jwt.ts      # JWT authentication
+│   │   │   └── pdfGenerator.ts  # PDF invoice generation
+│   │   ├── middleware/     # Express middleware (auth, error handling)
 │   │   ├── routes/         # API route handlers
 │   │   └── prisma/         # Database utilities
 │   └── package.json
 ├── frontend/               # React frontend application
 │   ├── src/
 │   │   ├── components/     # Reusable React components
-│   │   ├── pages/          # Page components
+│   │   │   ├── Layout.tsx  # Main layout with navigation
+│   │   │   ├── ProtectedRoute.tsx  # Role-based routing
+│   │   │   └── BillPreview.tsx     # Invoice preview dialog
+│   │   ├── pages/          # Page components (Dashboard, Billing, etc.)
+│   │   ├── theme/          # Material-UI theming
 │   │   ├── App.tsx         # Main application component
 │   │   └── main.tsx        # Application entry point
 │   └── package.json
 ├── ANALYSIS_AND_INSTRUCTIONS.md  # Detailed system analysis
-├── start-dev.sh           # Development environment startup script
-└── test-backend.sh        # Backend API testing script
+├── docker-compose.yml     # PostgreSQL container setup
+├── start-dev.sh          # Development environment startup script
+└── test-backend.sh       # Backend API testing script
 ```
 
 ## Getting Started
@@ -74,11 +85,19 @@ greengrass/
 
 ### Database Setup
 
-1. Create a PostgreSQL database named `greengrass`
-2. Create a user with appropriate permissions
-3. Update the `DATABASE_URL` in `backend/.env`
+1. **Start PostgreSQL with Docker:**
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Alternative: Local PostgreSQL setup**
+   - Create a PostgreSQL database named `greengrass`
+   - Create a user with appropriate permissions
+   - Update the `DATABASE_URL` in `backend/.env`
 
 Example connection string:
+
 ```
 DATABASE_URL="postgresql://username:password@localhost:5432/greengrass"
 ```
@@ -86,31 +105,40 @@ DATABASE_URL="postgresql://username:password@localhost:5432/greengrass"
 ### Quick Start
 
 1. **Clone and setup:**
+
    ```bash
    # Make sure you're in the project root directory
    cd greengrass
    ```
 
 2. **Start development environment:**
+
    ```bash
    ./start-dev.sh
    ```
-   
+
    This script will:
+
    - Install dependencies for both backend and frontend
    - Set up the database schema
    - Seed initial data
    - Start both development servers
 
 3. **Access the application:**
+
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:3000
+
+4. **Login credentials:**
+   - **Admin:** admin@grongraset.se / admin123 (full access)
+   - **Member:** member@grongraset.se / member123 (own household only)
 
 ### Manual Setup
 
 If you prefer to set up manually:
 
 #### Backend Setup
+
 ```bash
 cd backend
 npm install
@@ -123,6 +151,7 @@ npm run dev
 ```
 
 #### Frontend Setup
+
 ```bash
 cd frontend
 npm install
@@ -133,30 +162,36 @@ npm run dev
 
 ### Current Implementation
 
-- ✅ **Database Schema**: Complete PostgreSQL schema with all entities
+- ✅ **Database Schema**: Complete PostgreSQL schema focused on quarterly billing
+- ✅ **Authentication System**: JWT-based auth with ADMIN/MEMBER roles
 - ✅ **API Routes**: Full CRUD operations for all major entities
-- ✅ **Authentication Skeleton**: JWT-ready authentication structure
-- ✅ **Frontend Layout**: Responsive Material-UI layout with navigation
-- ✅ **Dashboard**: Overview with statistics and recent activities
-- ✅ **Billing Logic**: Quarter and monthly bill generation
-- ✅ **Meter Reading Management**: Support for both main and household meters
-- ✅ **Reconciliation**: Utility consumption reconciliation between meters
-- ✅ **Reports**: Various reporting endpoints
+- ✅ **Frontend Application**: Complete React/TypeScript app with Material-UI
+- ✅ **Role-based Access**: Different interfaces for admins vs members
+- ✅ **Household Management**: 14 households with equal shares (1/14 each)
+- ✅ **Utility Services**: Water, electricity, membership fees, etc.
+- ✅ **Meter Management**: Both main meters and household meters
+- ✅ **Meter Readings**: Role-based reading management with consumption calculations
+- ✅ **Quarterly Billing**: Complete bill generation with volume-based calculations
+- ✅ **Reconciliation System**: Main vs household meter reconciliation as separate line items
+- ✅ **PDF Invoice Generation**: Professional invoices with detailed cost breakdowns
+- ✅ **Payment Tracking**: Mark bills as paid with audit trail
+- ✅ **Historical Data Import**: Excel import with UTC date handling
+- ✅ **Swedish Localization**: Currency formatting and Swedish terminology
 
 ### Planned Features
 
-- 🔲 **Full Frontend Implementation**: Complete all page components
-- 🔲 **Authentication**: JWT-based login system
-- 🔲 **Data Import**: Excel file import for migration
-- 🔲 **Export Features**: PDF bills, CSV reports
-- 🔲 **Email Notifications**: Automated billing notifications
-- 🔲 **User Roles**: Admin, household member, read-only access
-- 🔲 **Audit Trail**: Track all changes and actions
-- 🔲 **Backup/Restore**: Database backup and restore functionality
+- 🔲 **Email Notifications**: Automated billing and reminder notifications
+- 🔲 **Advanced Reporting**: Consumption trends and cost analysis dashboards
+- 🔲 **Data Export**: Enhanced CSV and Excel export functionality
+- 🔲 **Mobile Optimization**: Progressive Web App features
+- 🔲 **Advanced User Management**: Multiple admin levels and permissions
+- 🔲 **Audit Trail**: Enhanced logging and change tracking
+- 🔲 **Integration APIs**: Banking integration for payment automation
 
 ## API Endpoints
 
 ### Households
+
 - `GET /api/households` - List all households
 - `GET /api/households/:id` - Get household details
 - `POST /api/households` - Create new household
@@ -164,12 +199,14 @@ npm run dev
 - `DELETE /api/households/:id` - Deactivate household
 
 ### Utility Services
+
 - `GET /api/utility-services` - List all services
 - `GET /api/utility-services/:id` - Get service details
 - `POST /api/utility-services` - Create new service
 - `PUT /api/utility-services/:id` - Update service
 
 ### Meter Readings
+
 - `GET /api/meter-readings` - List readings with filters
 - `POST /api/meter-readings` - Create new reading
 - `PUT /api/meter-readings/:id` - Update reading
@@ -177,14 +214,19 @@ npm run dev
 - `POST /api/meter-readings/bulk` - Bulk create readings
 
 ### Billing
+
 - `GET /api/billing/periods` - List billing periods
 - `POST /api/billing/periods` - Create billing period
-- `GET /api/billing/quarterly` - List quarterly bills
-- `GET /api/billing/monthly` - List monthly bills
+- `GET /api/billing/quarterly` - List quarterly bills with filters
 - `POST /api/billing/generate` - Generate bills for period
-- `GET /api/billing/reconciliation/:serviceId/:periodId` - Reconciliation data
+- `GET /api/billing/quarterly/:id` - Get specific bill details
+- `GET /api/billing/quarterly/:id/pdf` - Download bill as PDF
+- `PATCH /api/billing/quarterly/:id/mark-paid` - Mark bill as paid
+- `POST /api/billing/generate-pdfs` - Bulk generate PDF files
+- `GET /api/billing/check-readiness/:periodId` - Check if period is ready for billing
 
 ### Reports
+
 - `GET /api/reports/dashboard` - Dashboard overview data
 - `GET /api/reports/consumption/:serviceId` - Consumption report
 - `GET /api/reports/billing/:periodId` - Billing period report
@@ -194,26 +236,45 @@ npm run dev
 
 The system uses a comprehensive PostgreSQL schema with the following main entities:
 
-- **Households**: Information about each household (14 total)
-- **UtilityServices**: Water, electricity, gas, etc.
+- **Households**: Information about each household (14 total with equal 1/14 shares)
+- **Users**: Authentication and role management (ADMIN/MEMBER)
+- **UtilityServices**: Water, electricity, membership fees, etc.
 - **MainMeters**: Meters for the entire facility
 - **HouseholdMeters**: Individual household meters
-- **BillingPeriods**: Quarter/monthly billing periods
-- **MeterReadings**: Actual consumption readings
-- **QuarterlyBills**: Complete quarterly bills with shared costs
-- **MonthlyBills**: Utility-only monthly bills
-- **Payments**: Payment tracking
-- **SharedCosts**: Common expenses distributed among households
+- **BillingPeriods**: Quarterly billing periods (4-month cycles)
+- **MeterReadings**: Actual consumption readings (household and main)
 - **UtilityPricing**: Historical pricing for each service
+- **UtilityBilling**: Detailed billing calculations per household per service
+- **UtilityReconciliation**: Reconciliation between main and household meters
+- **QuarterlyBills**: Complete quarterly bills with all costs
+- **Payments**: Payment tracking and audit trail
+
+**Note**: Monthly billing has been removed for simplicity - the system now focuses exclusively on quarterly billing periods.
 
 ## Development
 
-### Testing Backend API
+### VS Code Tasks
+
+The project includes VS Code tasks for common operations:
+
 ```bash
-./test-backend.sh
+# Use Ctrl+Shift+P → "Tasks: Run Task" and select:
+- docker-up          # Start PostgreSQL container
+- dev-backend        # Start backend development server
+- dev-frontend       # Start frontend development server
+- prisma-generate    # Generate Prisma client
+- prisma-migrate     # Run database migrations
+- test-backend       # Run backend tests
+```
+
+### Testing Backend API
+
+```bash
+./test-backend.sh    # Test all API endpoints with sample data
 ```
 
 ### Database Commands
+
 ```bash
 # View database in browser
 npx prisma studio
@@ -221,11 +282,15 @@ npx prisma studio
 # Reset database
 npx prisma db push --force-reset
 
-# Generate new migration
+# Generate Prisma client after schema changes
+npx prisma generate
+
+# Push schema changes to database
 npx prisma db push
 ```
 
 ### Frontend Development
+
 ```bash
 cd frontend
 npm run dev     # Start development server
@@ -238,12 +303,14 @@ npm run preview # Preview production build
 This project is specifically designed for Samfällighetsförening Gröngräset but can be adapted for other similar organizations.
 
 ### Code Style
+
 - TypeScript for type safety
 - ESLint for code quality
 - Prettier for code formatting
 - Conventional commits
 
 ### Adding Features
+
 1. Update database schema in `prisma/schema.prisma`
 2. Create/update API endpoints in `backend/src/routes/`
 3. Add frontend components in `frontend/src/`
