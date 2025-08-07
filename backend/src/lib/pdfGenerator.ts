@@ -129,15 +129,14 @@ export class PDFGenerator {
         utilityBillings: utilityBillings.map((ub) => ({
           serviceName: ub.service.name,
           serviceType: ub.service.serviceType,
-          consumption: Number(ub.adjustedConsumption),
+          consumption: Number(ub.consumption),
           unit: ub.service.unit,
           pricePerUnit: Number(ub.costPerUnit),
-          fixedFee: Number(ub.fixedFeeShare),
+          fixedFee: Number(ub.fixedCost),
           variableCost: Number(ub.consumptionCost),
           totalCost: Number(ub.totalUtilityCost),
-          meterReading: Number(ub.rawConsumption), // Using raw consumption as meter reading
-          previousReading:
-            Number(ub.rawConsumption) - Number(ub.adjustedConsumption), // Calculated previous reading
+          meterReading: Number(ub.consumption), // Using consumption as meter reading
+          previousReading: 0, // Simplified - not calculated anymore
         })),
       };
 
@@ -199,15 +198,14 @@ export class PDFGenerator {
         utilityBillings: utilityBillings.map((ub) => ({
           serviceName: ub.service.name,
           serviceType: ub.service.serviceType,
-          consumption: Number(ub.adjustedConsumption),
+          consumption: Number(ub.consumption),
           unit: ub.service.unit,
           pricePerUnit: Number(ub.costPerUnit),
-          fixedFee: Number(ub.fixedFeeShare),
+          fixedFee: Number(ub.fixedCost),
           variableCost: Number(ub.consumptionCost),
           totalCost: Number(ub.totalUtilityCost),
-          meterReading: Number(ub.rawConsumption), // Using raw consumption as meter reading
-          previousReading:
-            Number(ub.rawConsumption) - Number(ub.adjustedConsumption), // Calculated previous reading
+          meterReading: Number(ub.consumption), // Using consumption as meter reading
+          previousReading: 0, // Simplified - not calculated anymore
         })),
       };
 
@@ -659,5 +657,83 @@ export class PDFGenerator {
     return `${year}${month
       .toString()
       .padStart(2, "0")}-${householdNumber}-${billId}`;
+  }
+
+  /**
+   * Helper function to expand utility billings into separate rows for display
+   * This creates separate rows for variable cost, fixed cost, and reconciliation adjustments
+   */
+  private static expandUtilityBillingsForDisplay(
+    utilityBillings: BillData["utilityBillings"]
+  ) {
+    const expandedRows: Array<{
+      serviceName: string;
+      description: string;
+      quantity: number;
+      unit: string;
+      pricePerUnit: number;
+      variableCost: number;
+      fixedCost: number;
+      totalCost: number;
+      isReconciliation?: boolean;
+    }> = [];
+
+    utilityBillings.forEach((utility) => {
+      if (utility.serviceType === "WATER") {
+        // Water - Variable cost (consumption)
+        expandedRows.push({
+          serviceName: `${utility.serviceName} - Rörlig kostnad`,
+          description: `Vattenförbrukning: ${utility.consumption.toFixed(1)} ${
+            utility.unit
+          }`,
+          quantity: utility.consumption,
+          unit: utility.unit,
+          pricePerUnit: utility.pricePerUnit,
+          variableCost: utility.variableCost,
+          fixedCost: 0,
+          totalCost: utility.variableCost,
+        });
+
+        // Water - Fixed cost
+        expandedRows.push({
+          serviceName: `${utility.serviceName} - Fast avgift`,
+          description: "Kvartalsavgift för vattenförsörjning",
+          quantity: 1,
+          unit: "st",
+          pricePerUnit: utility.fixedFee,
+          variableCost: 0,
+          fixedCost: utility.fixedFee,
+          totalCost: utility.fixedFee,
+        });
+
+        // Reconciliation adjustments are now handled as separate records in the database
+        // No need for separate handling here anymore
+      } else {
+        // Other services (membership, etc.) - keep as single row
+        expandedRows.push({
+          serviceName: utility.serviceName,
+          description:
+            utility.serviceType === "MEMBERSHIP"
+              ? "Kvartalsmässig medlemsavgift för samfällighetsföreningen"
+              : "",
+          quantity:
+            utility.serviceType === "MEMBERSHIP" ? 1 : utility.consumption,
+          unit: utility.serviceType === "MEMBERSHIP" ? "st" : utility.unit,
+          pricePerUnit:
+            utility.serviceType === "MEMBERSHIP"
+              ? utility.fixedFee
+              : utility.pricePerUnit,
+          variableCost:
+            utility.serviceType === "MEMBERSHIP" ? 0 : utility.variableCost,
+          fixedCost:
+            utility.serviceType === "MEMBERSHIP"
+              ? utility.fixedFee
+              : utility.fixedFee,
+          totalCost: utility.totalCost,
+        });
+      }
+    });
+
+    return expandedRows;
   }
 }

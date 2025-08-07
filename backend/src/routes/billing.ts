@@ -5,6 +5,173 @@ import { PDFGenerator } from "../lib/pdfGenerator";
 
 const router = Router();
 
+// Helper function to generate reconciliation records for a billing period
+async function generateReconciliationRecords(billingPeriodId: string) {
+  // Get billing period info
+  const billingPeriod = await prisma.billingPeriod.findUnique({
+    where: { id: billingPeriodId },
+  });
+
+  if (!billingPeriod) {
+    throw new Error("Billing period not found");
+  }
+
+  // Get all services that require reconciliation (typically water services)
+  const servicesRequiringReconciliation = await prisma.utilityService.findMany({
+    where: {
+      requiresReadings: true,
+      // Only create reconciliation for services that have both main meters and household meters
+      AND: [{ mainMeters: { some: {} } }, { householdMeters: { some: {} } }],
+    },
+    include: {
+      mainMeters: {
+        include: {
+          readings: {
+            where: { billingPeriodId },
+            include: {
+              billingPeriod: true,
+            },
+          },
+        },
+      },
+      householdMeters: {
+        include: {
+          readings: {
+            where: { billingPeriodId },
+            include: {
+              billingPeriod: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  for (const service of servicesRequiringReconciliation) {
+    // Check if reconciliation already exists for this service and period
+    const existingReconciliation = await prisma.utilityReconciliation.findFirst(
+      {
+        where: {
+          serviceId: service.id,
+          billingPeriodId,
+        },
+      }
+    );
+
+    if (existingReconciliation) {
+      console.log(
+        `Reconciliation already exists for ${service.name} in this period`
+      );
+      continue;
+    }
+
+    // Calculate main meter consumption
+    let totalMainConsumption = 0;
+    for (const mainMeter of service.mainMeters) {
+      for (const reading of mainMeter.readings) {
+        // Get previous reading to calculate consumption
+        const previousReading = await prisma.mainMeterReading.findFirst({
+          where: {
+            meterId: mainMeter.id,
+            billingPeriod: {
+              endDate: { lt: billingPeriod.startDate },
+            },
+          },
+          orderBy: { billingPeriod: { endDate: "desc" } },
+        });
+
+        const consumption = previousReading
+          ? Number(reading.meterReading) - Number(previousReading.meterReading)
+          : Number(reading.meterReading);
+
+        totalMainConsumption += consumption;
+      }
+    }
+
+    // Calculate total household consumption
+    let totalHouseholdConsumption = 0;
+    for (const householdMeter of service.householdMeters) {
+      for (const reading of householdMeter.readings) {
+        // Get previous reading to calculate consumption
+        const previousReading = await prisma.householdMeterReading.findFirst({
+          where: {
+            householdMeterId: householdMeter.id,
+            billingPeriod: {
+              endDate: { lt: billingPeriod.startDate },
+            },
+          },
+          orderBy: { billingPeriod: { endDate: "desc" } },
+        });
+
+        const consumption = previousReading
+          ? Number(reading.meterReading) - Number(previousReading.meterReading)
+          : Number(reading.meterReading);
+
+        totalHouseholdConsumption += consumption;
+      }
+    }
+
+    // Calculate reconciliation difference
+    const difference = totalMainConsumption - totalHouseholdConsumption;
+
+    // Only create reconciliation if there's a meaningful difference (e.g., more than 1% or absolute value > 10)
+    const significantDifference =
+      Math.abs(difference) > 10 ||
+      (totalMainConsumption > 0 &&
+        Math.abs(difference / totalMainConsumption) > 0.01);
+
+    if (!significantDifference) {
+      console.log(
+        `No significant reconciliation needed for ${service.name}: difference = ${difference}`
+      );
+      continue;
+    }
+
+    // Calculate cost per unit from service pricing
+    const pricing = await prisma.utilityPricing.findFirst({
+      where: {
+        serviceId: service.id,
+        isActive: true,
+        effectiveDate: { lte: billingPeriod.endDate },
+      },
+      orderBy: { effectiveDate: "desc" },
+    });
+
+    if (!pricing) {
+      console.log(
+        `No pricing found for service ${service.name}, skipping reconciliation`
+      );
+      continue;
+    }
+
+    // Get number of active households for this period
+    const activeHouseholds = await prisma.household.count({
+      where: { isActive: true },
+    });
+
+    // Calculate adjustment per household (in volume, not cost)
+    const volumeAdjustmentPerHousehold =
+      activeHouseholds > 0 ? difference / activeHouseholds : 0;
+
+    // Create reconciliation record - store volume adjustment (m³), not cost
+    await prisma.utilityReconciliation.create({
+      data: {
+        serviceId: service.id,
+        billingPeriodId,
+        mainMeterTotal: totalMainConsumption,
+        householdTotal: totalHouseholdConsumption,
+        difference,
+        adjustmentPerHousehold: volumeAdjustmentPerHousehold, // Store volume adjustment (m³)
+        reconciliationDate: billingPeriod.endDate,
+      },
+    });
+
+    console.log(
+      `Created reconciliation for ${service.name}: ${difference} ${service.unit} difference, ${volumeAdjustmentPerHousehold} ${service.unit} per household`
+    );
+  }
+}
+
 // Validation schemas
 const billingPeriodSchema = z.object({
   periodName: z.string().min(1).max(100),
@@ -210,18 +377,7 @@ router.post("/generate", async (req, res, next) => {
       include: {
         householdMeters: {
           include: {
-            service: {
-              include: {
-                pricing: {
-                  where: {
-                    isActive: true,
-                    effectiveDate: { lte: billingPeriod.endDate },
-                  },
-                  orderBy: { effectiveDate: "desc" },
-                  take: 1,
-                },
-              },
-            },
+            service: true,
             readings: {
               where: { billingPeriodId },
             },
@@ -231,6 +387,9 @@ router.post("/generate", async (req, res, next) => {
     });
 
     if (billType === "quarterly") {
+      // STEP 1: Calculate and create reconciliation records for services that require it
+      await generateReconciliationRecords(billingPeriodId);
+
       // Generate quarterly bills with shared costs
       const sharedCosts = await prisma.sharedCost.findMany({
         where: {
@@ -246,11 +405,54 @@ router.post("/generate", async (req, res, next) => {
         const utilityDetails = [];
 
         // Calculate utility costs
-        for (const meter of household.householdMeters) {
-          const reading = meter.readings[0];
-          const pricing = meter.service.pricing[0];
+        console.log(
+          `Processing household ${household.householdNumber}, meters: ${household.householdMeters.length}`
+        );
 
-          if (reading && pricing) {
+        for (const meter of household.householdMeters) {
+          console.log(
+            `Processing meter for service: ${meter.service.name}, requiresReadings: ${meter.service.requiresReadings}`
+          );
+
+          // Fetch pricing separately for this service
+          // Use a more lenient date check - look for active pricing around the billing period
+          const pricing = await prisma.utilityPricing.findFirst({
+            where: {
+              serviceId: meter.serviceId,
+              isActive: true,
+              // Allow pricing that becomes effective up to a few days after the billing period
+              effectiveDate: {
+                lte: new Date(
+                  billingPeriod.endDate.getTime() + 2 * 24 * 60 * 60 * 1000
+                ),
+              },
+            },
+            orderBy: { effectiveDate: "desc" },
+          });
+
+          if (!pricing) {
+            console.log(
+              `No pricing found for service ${meter.service.name} (${meter.service.serviceType})`
+            );
+            continue;
+          }
+
+          console.log(
+            `Pricing found: ${pricing.pricePerUnit}/unit, ${pricing.fixedFeePerHousehold} fixed`
+          );
+
+          const reading = meter.readings[0];
+          console.log(
+            `Readings for this meter: ${meter.readings.length}`,
+            reading ? `Reading: ${reading.meterReading}` : "No reading"
+          );
+
+          // For services that require readings, we need a reading to bill
+          if (meter.service.requiresReadings && reading) {
+            console.log(
+              `Processing service with readings: ${meter.service.name}`
+            );
+
             // Get previous reading for consumption calculation
             const previousReading =
               await prisma.householdMeterReading.findFirst({
@@ -263,15 +465,102 @@ router.post("/generate", async (req, res, next) => {
                 orderBy: { billingPeriod: { endDate: "desc" } },
               });
 
+            console.log(
+              `Previous reading: ${
+                previousReading ? previousReading.meterReading : "none"
+              }`
+            );
+
             const consumption = previousReading
               ? Number(reading.meterReading) -
                 Number(previousReading.meterReading)
               : Number(reading.meterReading);
 
+            console.log(`Consumption calculated: ${consumption}`);
+
             const variableCost = consumption * Number(pricing.pricePerUnit);
             const fixedCost = Number(pricing.fixedFeePerHousehold);
 
-            totalUtilityCosts += variableCost + fixedCost;
+            console.log(
+              `Variable cost: ${variableCost}, Fixed cost: ${fixedCost}`
+            );
+
+            // Check for existing reconciliation adjustment for this service and period
+            const reconciliation = await prisma.utilityReconciliation.findFirst(
+              {
+                where: {
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                },
+              }
+            );
+
+            // Calculate reconciliation cost from volume stored in database
+            const reconciliationVolume = reconciliation
+              ? Number(reconciliation.adjustmentPerHousehold)
+              : 0;
+            const reconciliationCost =
+              reconciliationVolume * Number(pricing.pricePerUnit);
+
+            // Calculate total cost components
+            const totalServiceCost =
+              variableCost + fixedCost + reconciliationCost;
+            totalUtilityCosts += totalServiceCost;
+
+            console.log(
+              `Total service cost: ${totalServiceCost}, Running total utility costs: ${totalUtilityCosts}`
+            );
+
+            // Create separate UtilityBilling records for better invoice clarity
+
+            // 1. Variable cost (consumption) record - always create if there's consumption (including 0 or negative)
+            if (consumption !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: consumption,
+                  costPerUnit: Number(pricing.pricePerUnit),
+                  consumptionCost: variableCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: variableCost,
+                },
+              });
+            }
+
+            // 2. Reconciliation adjustment record (if any)
+            if (reconciliationCost !== 0 && reconciliation) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: reconciliationVolume,
+                  costPerUnit: Number(pricing.pricePerUnit),
+                  consumptionCost: reconciliationCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: reconciliationCost,
+                  reconciliationId: reconciliation.id,
+                },
+              });
+            }
+
+            // 3. Fixed fee record - only if there's a fixed fee
+            if (fixedCost !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: 0, // No consumption for fixed fee
+                  costPerUnit: 0, // Fixed fee, no per-unit cost
+                  consumptionCost: 0, // No consumption cost
+                  fixedCost: fixedCost,
+                  totalUtilityCost: fixedCost,
+                },
+              });
+            }
 
             utilityDetails.push({
               serviceId: meter.serviceId,
@@ -279,11 +568,69 @@ router.post("/generate", async (req, res, next) => {
               consumption,
               variableCost,
               fixedCost,
+              reconciliationAdjustment: reconciliationCost,
+              totalCost: totalServiceCost,
               meterReading: Number(reading.meterReading),
               previousMeterReading: previousReading
                 ? Number(previousReading.meterReading)
                 : 0,
             });
+          }
+          // Handle services that don't require readings (like INTERNET, etc.)
+          // BUT exclude MEMBERSHIP from utility costs - it's handled separately
+          else if (
+            !meter.service.requiresReadings &&
+            meter.service.serviceType !== "MEMBERSHIP"
+          ) {
+            console.log(
+              `Processing service without readings: ${meter.service.name}`
+            );
+
+            const fixedCost = Number(pricing.fixedFeePerHousehold);
+            console.log(`Fixed cost for ${meter.service.name}: ${fixedCost}`);
+
+            if (fixedCost > 0) {
+              totalUtilityCosts += fixedCost;
+              console.log(`Added fixed cost, new total: ${totalUtilityCosts}`);
+
+              // Create UtilityBilling record for fixed cost service
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: 0, // No consumption for fixed services
+                  costPerUnit: 0, // Fixed service, no per-unit cost
+                  consumptionCost: 0, // No consumption cost
+                  fixedCost: fixedCost,
+                  totalUtilityCost: fixedCost,
+                },
+              });
+
+              utilityDetails.push({
+                serviceId: meter.serviceId,
+                serviceName: meter.service.name,
+                consumption: 0,
+                variableCost: 0,
+                fixedCost,
+                reconciliationAdjustment: 0,
+                totalCost: fixedCost,
+                meterReading: 0,
+                previousMeterReading: 0,
+              });
+            }
+          }
+          // Skip MEMBERSHIP service here - it's handled separately as memberFee
+          else if (meter.service.serviceType === "MEMBERSHIP") {
+            console.log(
+              `Skipping MEMBERSHIP service - handled separately as member fee`
+            );
+          } else {
+            console.log(
+              `Skipping service ${meter.service.name}: requiresReadings=${
+                meter.service.requiresReadings
+              }, hasReading=${!!reading}`
+            );
           }
         }
 
@@ -294,7 +641,7 @@ router.post("/generate", async (req, res, next) => {
         );
 
         // Calculate member fee from existing utility billings (MEMBERSHIP service)
-        const memberFeeFromUtility = await prisma.utilityBilling.findFirst({
+        let memberFeeFromUtility = await prisma.utilityBilling.findFirst({
           where: {
             householdId: household.id,
             billingPeriodId,
@@ -302,9 +649,57 @@ router.post("/generate", async (req, res, next) => {
           },
         });
 
-        const memberFee = memberFeeFromUtility
-          ? Number(memberFeeFromUtility.totalUtilityCost)
-          : 0;
+        let memberFee = 0;
+
+        if (memberFeeFromUtility) {
+          memberFee = Number(memberFeeFromUtility.totalUtilityCost);
+        } else {
+          // Get member fee from MEMBERSHIP service pricing and create UtilityBilling record
+          const membershipService = await prisma.utilityService.findFirst({
+            where: { serviceType: "MEMBERSHIP" },
+          });
+
+          if (membershipService) {
+            // Use the same lenient pricing query as for other services
+            const membershipPricing = await prisma.utilityPricing.findFirst({
+              where: {
+                serviceId: membershipService.id,
+                isActive: true,
+                // Allow pricing that becomes effective up to a few days after the billing period
+                effectiveDate: {
+                  lte: new Date(
+                    billingPeriod.endDate.getTime() + 2 * 24 * 60 * 60 * 1000
+                  ),
+                },
+              },
+              orderBy: { effectiveDate: "desc" },
+            });
+
+            if (membershipPricing) {
+              memberFee = Number(membershipPricing.fixedFeePerHousehold);
+
+              // Create UtilityBilling record for membership fee
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: membershipService.id,
+                  billingPeriodId,
+                  consumption: 0,
+                  costPerUnit: 0,
+                  consumptionCost: 0,
+                  fixedCost: memberFee,
+                  totalUtilityCost: memberFee,
+                },
+              });
+            } else {
+              // Fallback to default membership fee
+              memberFee = 1000;
+            }
+          } else {
+            // Fallback to default membership fee
+            memberFee = 1000;
+          }
+        }
         const totalAmount = totalUtilityCosts + totalSharedCosts + memberFee;
 
         const bill = await prisma.quarterlyBill.create({
@@ -342,10 +737,37 @@ router.post("/generate", async (req, res, next) => {
 
         // Calculate utility costs
         for (const meter of household.householdMeters) {
-          const reading = meter.readings[0];
-          const pricing = meter.service.pricing[0];
+          // Fetch pricing separately for this service
+          // Use a more lenient date check - look for active pricing around the billing period
+          const pricing = await prisma.utilityPricing.findFirst({
+            where: {
+              serviceId: meter.serviceId,
+              isActive: true,
+              // Allow pricing that becomes effective up to a few days after the billing period
+              effectiveDate: {
+                lte: new Date(
+                  billingPeriod.endDate.getTime() + 2 * 24 * 60 * 60 * 1000
+                ),
+              },
+            },
+            orderBy: { effectiveDate: "desc" },
+          });
 
-          if (reading && pricing) {
+          if (!pricing) {
+            console.log(
+              `No pricing found for service ${meter.service.name} (${meter.service.serviceType})`
+            );
+            continue;
+          }
+
+          // Skip services that don't require readings for monthly bills
+          if (!meter.service.requiresReadings) {
+            continue;
+          }
+
+          const reading = meter.readings[0];
+
+          if (reading) {
             // Get previous reading for consumption calculation
             const previousReading =
               await prisma.householdMeterReading.findFirst({
@@ -366,7 +788,78 @@ router.post("/generate", async (req, res, next) => {
             const variableCost = consumption * Number(pricing.pricePerUnit);
             const fixedCost = Number(pricing.fixedFeePerHousehold);
 
-            totalUtilityCosts += variableCost + fixedCost;
+            // Check for existing reconciliation adjustment for this service and period
+            const reconciliation = await prisma.utilityReconciliation.findFirst(
+              {
+                where: {
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                },
+              }
+            );
+
+            // Calculate reconciliation cost from volume stored in database
+            const reconciliationVolume = reconciliation
+              ? Number(reconciliation.adjustmentPerHousehold)
+              : 0;
+            const reconciliationCost =
+              reconciliationVolume * Number(pricing.pricePerUnit);
+
+            const totalServiceCost =
+              variableCost + fixedCost + reconciliationCost;
+
+            totalUtilityCosts += totalServiceCost;
+
+            // Create separate UtilityBilling records for monthly bills too
+
+            // 1. Variable cost (consumption) record - always create if there's consumption (including 0 or negative)
+            if (consumption !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: consumption,
+                  costPerUnit: Number(pricing.pricePerUnit),
+                  consumptionCost: variableCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: variableCost,
+                },
+              });
+            }
+
+            // 2. Reconciliation adjustment record (if any)
+            if (reconciliationCost !== 0 && reconciliation) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: reconciliationVolume,
+                  costPerUnit: Number(pricing.pricePerUnit),
+                  consumptionCost: reconciliationCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: reconciliationCost,
+                  reconciliationId: reconciliation.id,
+                },
+              });
+            }
+
+            // 3. Fixed fee record - only if there's a fixed fee
+            if (fixedCost !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: meter.serviceId,
+                  billingPeriodId,
+                  consumption: 0, // No consumption for fixed fee
+                  costPerUnit: 0, // Fixed fee, no per-unit cost
+                  consumptionCost: 0, // No consumption cost
+                  fixedCost: fixedCost,
+                  totalUtilityCost: fixedCost,
+                },
+              });
+            }
 
             utilityDetails.push({
               serviceId: meter.serviceId,
@@ -374,11 +867,17 @@ router.post("/generate", async (req, res, next) => {
               consumption,
               variableCost,
               fixedCost,
+              reconciliationAdjustment: reconciliationCost,
+              totalCost: totalServiceCost,
               meterReading: Number(reading.meterReading),
               previousMeterReading: previousReading
                 ? Number(previousReading.meterReading)
                 : 0,
             });
+          } else {
+            console.log(
+              `No reading found for service ${meter.service.name} for household ${household.householdNumber}`
+            );
           }
         }
 
@@ -531,7 +1030,13 @@ router.get("/quarterly/:id", async (req, res, next) => {
         householdId: bill.householdId,
         billingPeriodId: bill.billingPeriodId,
       },
-      include: {
+      select: {
+        id: true,
+        consumption: true, // consumption amount (volume/quantity)
+        costPerUnit: true, // price per unit
+        consumptionCost: true, // variable cost (consumption * costPerUnit)
+        fixedCost: true, // fixed fee cost
+        totalUtilityCost: true, // total cost for this line
         service: {
           select: {
             id: true,
@@ -859,6 +1364,7 @@ router.get("/periods/:id/reporting-status", async (req, res, next) => {
                 id: true,
                 name: true,
                 serviceType: true,
+                requiresReadings: true,
               },
             },
             readings: {
@@ -878,9 +1384,9 @@ router.get("/periods/:id/reporting-status", async (req, res, next) => {
     // Calculate reporting status for each household
     const reportingStatus = households.map((household) => {
       const meters = household.householdMeters;
-      // Filter out MEMBERSHIP service as it doesn't require meter readings
+      // Filter to only services that require meter readings
       const metersRequiringReadings = meters.filter(
-        (meter) => meter.service.serviceType !== "MEMBERSHIP"
+        (meter) => meter.service.requiresReadings
       );
       const totalMeters = metersRequiringReadings.length;
       const reportedMeters = metersRequiringReadings.filter(
@@ -930,10 +1436,10 @@ router.get("/periods/:id/reporting-status", async (req, res, next) => {
         ? Math.round((completeHouseholds / totalHouseholds) * 100)
         : 0;
 
-    // Get services that require meter readings (exclude MEMBERSHIP)
+    // Get services that require meter readings
     const allServices = await prisma.utilityService.findMany({
       where: {
-        serviceType: { not: "MEMBERSHIP" },
+        requiresReadings: true,
         householdMeters: {
           some: {
             household: { isActive: true },
@@ -1076,6 +1582,142 @@ router.get("/check-readiness/:periodId", async (req, res, next) => {
     res.json({
       success: true,
       data: readinessData,
+    });
+    return;
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// DELETE /api/billing/delete-period-bills - Delete all bills and related data for a billing period
+router.delete("/delete-period-bills", async (req, res, next) => {
+  try {
+    const { billingPeriodId } = req.body;
+
+    if (!billingPeriodId) {
+      return res.status(400).json({
+        success: false,
+        message: "Billing period ID is required",
+      });
+    }
+
+    // Admin only
+    if (req.user?.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Admin role required.",
+      });
+    }
+
+    // Use transaction to ensure data consistency
+    const result = await prisma.$transaction(async (tx) => {
+      // Delete utility billings first (foreign key constraint)
+      const deletedUtilityBillings = await tx.utilityBilling.deleteMany({
+        where: { billingPeriodId },
+      });
+
+      // Delete quarterly bills
+      const deletedQuarterlyBills = await tx.quarterlyBill.deleteMany({
+        where: { billingPeriodId },
+      });
+
+      // Delete monthly bills
+      const deletedMonthlyBills = await tx.monthlyBill.deleteMany({
+        where: { billingPeriodId },
+      });
+
+      return {
+        utilityBillings: deletedUtilityBillings.count,
+        quarterlyBills: deletedQuarterlyBills.count,
+        monthlyBills: deletedMonthlyBills.count,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: result,
+      message: `Deleted ${result.quarterlyBills} quarterly bills, ${result.monthlyBills} monthly bills, and ${result.utilityBillings} utility billing records`,
+    });
+    return;
+  } catch (error) {
+    next(error);
+    return;
+  }
+});
+
+// DEBUG: Check reconciliation for 2025-04-30 and household 20
+router.get("/debug/reconciliation-2025", async (req, res, next) => {
+  try {
+    // Find 2025-04-30 period
+    const period = await prisma.billingPeriod.findFirst({
+      where: { periodName: "2025-04-30" },
+    });
+
+    if (!period) {
+      return res.json({
+        success: false,
+        message: "2025-04-30 period not found",
+      });
+    }
+
+    // Find household 20
+    const household = await prisma.household.findFirst({
+      where: { householdNumber: 20 },
+    });
+
+    if (!household) {
+      return res.json({ success: false, message: "Household 20 not found" });
+    }
+
+    // Check reconciliation data
+    const reconciliations = await prisma.utilityReconciliation.findMany({
+      where: { billingPeriodId: period.id },
+      include: { service: true },
+    });
+
+    // Check existing bills
+    const bills = await prisma.quarterlyBill.findMany({
+      where: {
+        billingPeriodId: period.id,
+        householdId: household.id,
+      },
+    });
+
+    // Check utility billing details
+    const utilityBillings = await prisma.utilityBilling.findMany({
+      where: {
+        householdId: household.id,
+        billingPeriodId: period.id,
+      },
+      include: {
+        service: true,
+        reconciliation: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        period: period.periodName,
+        household: `${household.householdNumber} - ${household.ownerName}`,
+        reconciliations: reconciliations.map((r) => ({
+          service: r.service.name,
+          adjustmentPerHousehold: r.adjustmentPerHousehold,
+        })),
+        existingBills: bills.length,
+        billTotals: bills.map((b) => ({
+          total: b.totalAmount,
+          utilities: b.totalUtilityCosts,
+          memberFee: b.memberFee,
+        })),
+        utilityBillings: utilityBillings.map((ub) => ({
+          service: ub.service.name,
+          consumptionCost: ub.consumptionCost,
+          fixedFee: ub.fixedCost,
+          total: ub.totalUtilityCost,
+        })),
+      },
     });
     return;
   } catch (error) {

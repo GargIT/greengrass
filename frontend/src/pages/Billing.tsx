@@ -4,12 +4,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Chip,
   CircularProgress,
   Alert,
@@ -30,7 +24,14 @@ import {
   Add as AddIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
+import {
+  DataGrid,
+  type GridColDef,
+  type GridRowParams,
+  GridActionsCellItem,
+} from "@mui/x-data-grid";
 import BillPreview from "../components/BillPreview";
 
 interface Household {
@@ -121,6 +122,218 @@ const Billing: React.FC = () => {
   const [selectedPeriodForGeneration, setSelectedPeriodForGeneration] =
     useState<string>("");
 
+  // Bill deletion (development only)
+  const [billDeletionLoading, setBillDeletionLoading] = useState(false);
+
+  // DataGrid columns for bills
+  const getStatusColor = (status: string): "success" | "error" | "warning" => {
+    switch (status) {
+      case "paid":
+        return "success";
+      case "overdue":
+        return "error";
+      case "pending":
+      default:
+        return "warning";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "paid":
+        return "Betald";
+      case "overdue":
+        return "Förfallen";
+      case "pending":
+      default:
+        return "Väntande";
+    }
+  };
+
+  const handleViewBill = (billId: string) => {
+    setSelectedBillId(billId);
+    setPreviewOpen(true);
+  };
+
+  const handleDownloadPdf = async (billId: string, householdNumber: number) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/billing/quarterly/${billId}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Kunde inte ladda ner PDF");
+      }
+
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = `Faktura_Hushall_${householdNumber}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ladda ner PDF");
+    }
+  };
+
+  const columns: GridColDef[] = [
+    {
+      field: "id",
+      headerName: "ID",
+      width: 90,
+      sortable: false,
+      filterable: false,
+    },
+    {
+      field: "householdInfo",
+      headerName: "Hushåll",
+      width: 200,
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" fontWeight="medium">
+            {params.row.household.ownerName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Hus {params.row.household.householdNumber}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "periodName",
+      headerName: "Period",
+      width: 150,
+      valueGetter: (_, row) => row.billingPeriod?.periodName || "",
+    },
+    {
+      field: "totalUtilityCosts",
+      headerName: "Vattenkostnad",
+      width: 130,
+      type: "number",
+      align: "right",
+      headerAlign: "right",
+      valueFormatter: (value: number) =>
+        `${Math.round(value).toLocaleString("sv-SE")} kr`,
+    },
+    {
+      field: "memberFee",
+      headerName: "Medlemsavgift",
+      width: 130,
+      type: "number",
+      align: "right",
+      headerAlign: "right",
+      valueFormatter: (value: number) =>
+        `${Math.round(value).toLocaleString("sv-SE")} kr`,
+    },
+    {
+      field: "totalAmount",
+      headerName: "Totalt",
+      width: 130,
+      type: "number",
+      align: "right",
+      headerAlign: "right",
+      valueFormatter: (value: number) =>
+        `${Math.round(value).toLocaleString("sv-SE")} kr`,
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight="medium">
+          {Math.round(params.value).toLocaleString("sv-SE")} kr
+        </Typography>
+      ),
+    },
+    {
+      field: "dueDate",
+      headerName: "Förfallodag",
+      width: 120,
+      valueFormatter: (value: string) =>
+        value ? new Date(value).toLocaleDateString("sv-SE") : "",
+    },
+    {
+      field: "status",
+      headerName: "Status",
+      width: 120,
+      renderCell: (params) => (
+        <Chip
+          label={getStatusText(params.value)}
+          color={getStatusColor(params.value)}
+          size="small"
+        />
+      ),
+    },
+    {
+      field: "actions",
+      type: "actions",
+      headerName: "Åtgärder",
+      width: 150,
+      getActions: (params) => {
+        const actions = [
+          <GridActionsCellItem
+            key="view"
+            icon={
+              <Tooltip title="Visa detaljer">
+                <ViewIcon />
+              </Tooltip>
+            }
+            label="Visa detaljer"
+            onClick={() => handleViewBill(params.row.id)}
+          />,
+          <GridActionsCellItem
+            key="download"
+            icon={
+              <Tooltip title="Ladda ner PDF">
+                <DownloadIcon />
+              </Tooltip>
+            }
+            label="Ladda ner PDF"
+            onClick={() =>
+              handleDownloadPdf(
+                params.row.id,
+                params.row.household.householdNumber
+              )
+            }
+          />,
+        ];
+
+        if (params.row.status === "pending") {
+          actions.push(
+            <GridActionsCellItem
+              key="payment"
+              icon={
+                <Tooltip title="Markera som betald">
+                  <PaymentIcon color="success" />
+                </Tooltip>
+              }
+              label="Markera som betald"
+              onClick={() => {
+                // TODO: Implement payment marking functionality
+                console.log("Mark as paid:", params.row.id);
+              }}
+            />
+          );
+        }
+
+        return actions;
+      },
+    },
+  ];
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -182,77 +395,9 @@ const Billing: React.FC = () => {
     setStatusFilter(event.target.value);
   };
 
-  const getStatusColor = (status: string): "success" | "error" | "warning" => {
-    switch (status) {
-      case "paid":
-        return "success";
-      case "overdue":
-        return "error";
-      case "pending":
-      default:
-        return "warning";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "Betald";
-      case "overdue":
-        return "Förfallen";
-      case "pending":
-      default:
-        return "Väntande";
-    }
-  };
-
-  const handleViewBill = (billId: string) => {
-    setSelectedBillId(billId);
-    setPreviewOpen(true);
-  };
-
   const handleClosePreview = () => {
     setPreviewOpen(false);
     setSelectedBillId("");
-  };
-
-  const handleDownloadPdf = async (billId: string, householdNumber: number) => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(`/api/billing/quarterly/${billId}/pdf`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Kunde inte ladda ner PDF");
-      }
-
-      // Get the filename from the Content-Disposition header
-      const contentDisposition = response.headers.get("Content-Disposition");
-      let filename = `Faktura_Hushall_${householdNumber}.pdf`;
-
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunde inte ladda ner PDF");
-    }
   };
 
   const filteredBills = bills.filter((bill) => {
@@ -366,6 +511,10 @@ const Billing: React.FC = () => {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        if (errorData && errorData.message) {
+          throw new Error(errorData.message);
+        }
         throw new Error("Kunde inte generera fakturor");
       }
 
@@ -385,6 +534,72 @@ const Billing: React.FC = () => {
       setError(err instanceof Error ? err.message : "Ett fel uppstod");
     } finally {
       setBillGenerationLoading(false);
+    }
+  };
+
+  // Delete bills for a period (development only)
+  const deleteBillsForPeriod = async (periodId: string) => {
+    setBillDeletionLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/billing/delete-period-bills", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          billingPeriodId: periodId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        if (errorData && errorData.message) {
+          throw new Error(errorData.message);
+        }
+        throw new Error("Kunde inte ta bort fakturor");
+      }
+
+      const data = await response.json();
+
+      // Refresh data after successful deletion
+      await fetchData();
+
+      // Show success message
+      setError(null);
+      const {
+        totalDeleted,
+        periodName,
+        deletedQuarterlyBills,
+        deletedMonthlyBills,
+        deletedUtilityBilling,
+        deletedUtilityReconciliation,
+      } = data.data;
+
+      let message = `Framgångsrikt borttagna ${totalDeleted} poster för period ${periodName}!`;
+      if (
+        deletedQuarterlyBills > 0 ||
+        deletedMonthlyBills > 0 ||
+        deletedUtilityBilling > 0 ||
+        deletedUtilityReconciliation > 0
+      ) {
+        message += `\n\nDetaljer:`;
+        if (deletedQuarterlyBills > 0)
+          message += `\n• ${deletedQuarterlyBills} periodfakturor`;
+        if (deletedMonthlyBills > 0)
+          message += `\n• ${deletedMonthlyBills} månadsfakturor`;
+        if (deletedUtilityBilling > 0)
+          message += `\n• ${deletedUtilityBilling} faktureringsposter`;
+        if (deletedUtilityReconciliation > 0)
+          message += `\n• ${deletedUtilityReconciliation} avstämningsposter`;
+      }
+
+      alert(message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ett fel uppstod");
+    } finally {
+      setBillDeletionLoading(false);
     }
   };
 
@@ -452,6 +667,7 @@ const Billing: React.FC = () => {
             bgcolor: "success.50",
             border: "2px solid",
             borderColor: "success.main",
+            overflow: "unset",
           }}
         >
           <CardContent>
@@ -470,7 +686,8 @@ const Billing: React.FC = () => {
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               ⚡ Kontrollera automatiskt att alla hushåll har lämnat in
-              mätaravläsningar innan du skapar fakturor
+              mätaravläsningar innan du skapar fakturor. Endast slutförda
+              perioder kan faktureras.
             </Typography>
 
             <Stack
@@ -487,11 +704,18 @@ const Billing: React.FC = () => {
                   disabled={readinessLoading}
                 >
                   <MenuItem value="">Välj period...</MenuItem>
-                  {periods.map((period) => (
-                    <MenuItem key={period.id} value={period.id}>
-                      {period.periodName}
-                    </MenuItem>
-                  ))}
+                  {periods
+                    .filter((period) => {
+                      // Only show completed periods (end date is in the past)
+                      const periodEnd = new Date(period.endDate);
+                      const now = new Date();
+                      return periodEnd <= now;
+                    })
+                    .map((period) => (
+                      <MenuItem key={period.id} value={period.id}>
+                        {period.periodName}
+                      </MenuItem>
+                    ))}
                 </Select>
               </FormControl>
 
@@ -606,39 +830,85 @@ const Billing: React.FC = () => {
                         </Box>
                       )}
 
-                    {/* Generate Bills Button */}
-                    {readiness.allReadingsComplete && (
-                      <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-                        <IconButton
-                          onClick={() =>
-                            generateBills(
-                              readiness.billingPeriodId,
-                              "quarterly"
-                            )
-                          }
-                          disabled={billGenerationLoading}
-                          sx={{
-                            bgcolor: "success.main",
-                            color: "white",
-                            "&:hover": { bgcolor: "success.dark" },
-                            padding: 2,
-                          }}
-                        >
-                          {billGenerationLoading ? (
-                            <CircularProgress size={20} color="inherit" />
-                          ) : (
-                            <AddIcon />
-                          )}
-                        </IconButton>
-                        <Box>
-                          <Typography variant="body1">
-                            Generera periodfakturor
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Skapa fakturor för alla {readiness.totalHouseholds}{" "}
-                            hushåll
-                          </Typography>
-                        </Box>
+                    {/* Action Buttons - Generate and Delete */}
+                    {selectedPeriodForGeneration && (
+                      <Stack direction="row" spacing={3} sx={{ mt: 3 }}>
+                        {/* Generate Bills Button */}
+                        {readiness.allReadingsComplete && (
+                          <Stack direction="row" spacing={2}>
+                            <IconButton
+                              onClick={() =>
+                                generateBills(
+                                  readiness.billingPeriodId,
+                                  "quarterly"
+                                )
+                              }
+                              disabled={billGenerationLoading}
+                              sx={{
+                                bgcolor: "success.main",
+                                color: "white",
+                                "&:hover": { bgcolor: "success.dark" },
+                                padding: 2,
+                              }}
+                            >
+                              {billGenerationLoading ? (
+                                <CircularProgress size={20} color="inherit" />
+                              ) : (
+                                <AddIcon />
+                              )}
+                            </IconButton>
+                            <Box>
+                              <Typography variant="body1">
+                                Generera periodfakturor
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Skapa fakturor för alla {readiness.totalHouseholds}{" "}
+                                hushåll
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        )}
+
+                        {/* Delete Bills Button (Development) */}
+                        <Stack direction="row" spacing={2}>
+                          <IconButton
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Är du säker på att du vill ta bort ALL faktureringsdata för period ${
+                                    periods.find(
+                                      (p) => p.id === selectedPeriodForGeneration
+                                    )?.periodName || "vald period"
+                                  }?\n\nDetta kommer att ta bort:\n• Fakturor (quarterly/monthly)\n• Faktureringsposter (utility_billing)\n• Avstämningar (utility_reconciliation)\n\nDetta kan inte ångras!`
+                                )
+                              ) {
+                                deleteBillsForPeriod(selectedPeriodForGeneration);
+                              }
+                            }}
+                            disabled={billDeletionLoading}
+                            sx={{
+                              bgcolor: "error.main",
+                              color: "white",
+                              "&:hover": { bgcolor: "error.dark" },
+                              padding: 2,
+                            }}
+                          >
+                            {billDeletionLoading ? (
+                              <CircularProgress size={20} color="inherit" />
+                            ) : (
+                              <DeleteIcon />
+                            )}
+                          </IconButton>
+                          <Box>
+                            <Typography variant="body1" color="error.main">
+                              Ta bort all faktureringsdata
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              🚧 Utvecklingsfunktion - tar bort fakturor,
+                              faktureringsposter och avstämningar
+                            </Typography>
+                          </Box>
+                        </Stack>
                       </Stack>
                     )}
                   </CardContent>
@@ -722,7 +992,7 @@ const Billing: React.FC = () => {
       </Box>
 
       {/* Filters */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3, overflow: "unset" }}>
         <CardContent>
           <Stack
             direction={{ xs: "column", md: "row" }}
@@ -737,11 +1007,18 @@ const Billing: React.FC = () => {
                 onChange={handlePeriodChange}
               >
                 <MenuItem value="">Alla perioder</MenuItem>
-                {periods.map((period) => (
-                  <MenuItem key={period.id} value={period.id}>
-                    {period.periodName}
-                  </MenuItem>
-                ))}
+                {periods
+                  .filter((period) => {
+                    // Only show completed periods (end date is in the past)
+                    const periodEnd = new Date(period.endDate);
+                    const now = new Date();
+                    return periodEnd <= now;
+                  })
+                  .map((period) => (
+                    <MenuItem key={period.id} value={period.id}>
+                      {period.periodName}
+                    </MenuItem>
+                  ))}
               </Select>
             </FormControl>
 
@@ -799,120 +1076,33 @@ const Billing: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Bills Table */}
+      {/* Bills DataGrid */}
       <Card sx={{ flexGrow: 1, overflow: "hidden" }}>
-        <TableContainer sx={{ height: "100%" }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Hushåll</TableCell>
-                <TableCell>Period</TableCell>
-                <TableCell align="right">Vattenkostnad</TableCell>
-                <TableCell align="right">Medlemsavgift</TableCell>
-                <TableCell align="right">Totalt</TableCell>
-                <TableCell>Förfallodag</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="center">Åtgärder</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredBills.map((bill) => (
-                <TableRow key={bill.id} hover>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="body2" fontWeight="medium">
-                        {bill.household.ownerName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Hus {bill.household.householdNumber}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {bill.billingPeriod.periodName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2">
-                      {Math.round(bill.totalUtilityCosts).toLocaleString(
-                        "sv-SE"
-                      )}{" "}
-                      kr
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2">
-                      {Math.round(bill.memberFee).toLocaleString("sv-SE")} kr
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="medium">
-                      {Math.round(bill.totalAmount).toLocaleString("sv-SE")} kr
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {new Date(bill.dueDate).toLocaleDateString("sv-SE")}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getStatusText(bill.status)}
-                      color={getStatusColor(bill.status)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="Visa detaljer">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewBill(bill.id)}
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Ladda ner PDF">
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            handleDownloadPdf(
-                              bill.id,
-                              bill.household.householdNumber
-                            )
-                          }
-                        >
-                          <DownloadIcon />
-                        </IconButton>
-                      </Tooltip>
-                      {bill.status === "pending" && (
-                        <Tooltip title="Markera som betald">
-                          <IconButton size="small" color="success">
-                            <PaymentIcon />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredBills.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ py: 4 }}
-                    >
-                      Inga fakturor hittades
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Box sx={{ height: 600, width: "100%" }}>
+          <DataGrid
+            rows={filteredBills}
+            columns={columns}
+            loading={loading}
+            disableRowSelectionOnClick
+            pageSizeOptions={[25, 50, 100]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 25 } },
+              columns: {
+                columnVisibilityModel: {
+                  id: false,
+                },
+              },
+            }}
+            onRowDoubleClick={(params: GridRowParams) =>
+              handleViewBill(params.row.id)
+            }
+            sx={{
+              "& .MuiDataGrid-row": {
+                cursor: "pointer",
+              },
+            }}
+          />
+        </Box>
       </Card>
 
       {/* Bill Preview Dialog */}

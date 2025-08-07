@@ -763,6 +763,23 @@ async function importExcelDataComplete() {
     for (let i = 1; i < periods.length; i++) {
       const currentPeriod = periods[i];
       const periodDate = new Date(currentPeriod.periodName);
+      const currentDate = new Date();
+
+      // Only create bills for historical periods (not future periods)
+      if (periodDate > currentDate) {
+        console.log(`⏭️  Skipping future period: ${currentPeriod.periodName}`);
+        continue;
+      }
+      
+      // Also check if we have any meter readings for this period
+      const hasReadings = await prisma.householdMeterReading.count({
+        where: { billingPeriodId: currentPeriod.id },
+      });
+      
+      if (hasReadings === 0) {
+        console.log(`📊 Skipping ${currentPeriod.periodName} - no meter readings found`);
+        continue;
+      }
 
       // Get correct pricing for this billing period
       const waterPricing = await prisma.utilityPricing.findFirst({
@@ -820,46 +837,96 @@ async function importExcelDataComplete() {
             const adjustment = reconciliation
               ? Number(reconciliation.adjustmentPerHousehold)
               : 0;
-            const adjustedConsumption = rawConsumption + adjustment;
+            const variableCost =
+              rawConsumption * Number(waterPricing.pricePerUnit);
+            const fixedCost = Number(waterPricing.fixedFeePerHousehold);
 
-            await prisma.utilityBilling.create({
-              data: {
-                householdId: household.id,
-                serviceId: waterService.id,
-                reconciliationId: reconciliation?.id,
-                billingPeriodId: currentPeriod.id,
-                rawConsumption,
-                reconciliationAdjustment: adjustment,
-                adjustedConsumption,
-                costPerUnit: Number(waterPricing.pricePerUnit),
-                consumptionCost:
-                  adjustedConsumption * Number(waterPricing.pricePerUnit),
-                fixedFeeShare: Number(waterPricing.fixedFeePerHousehold),
-                totalUtilityCost:
-                  adjustedConsumption * Number(waterPricing.pricePerUnit) +
-                  Number(waterPricing.fixedFeePerHousehold),
-              },
-            });
-            periodBillsCreated++;
+            // Create separate UtilityBilling records for better invoice clarity
+
+            // 1. Variable cost (consumption) record - always create if there's consumption
+            if (rawConsumption !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: waterService.id,
+                  billingPeriodId: currentPeriod.id,
+                  consumption: rawConsumption,
+                  costPerUnit: Number(waterPricing.pricePerUnit),
+                  consumptionCost: variableCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: variableCost,
+                  reconciliationId: null,
+                },
+              });
+              periodBillsCreated++;
+            }
+
+            // 2. Reconciliation adjustment record (if any)
+            if (adjustment !== 0) {
+              // Use the actual volume adjustment from reconciliation, not back-calculated from cost
+              const reconciliationVolume = reconciliation
+                ? Number(reconciliation.adjustmentPerHousehold)
+                : adjustment / Number(waterPricing.pricePerUnit);
+              
+              // Calculate the correct cost: volume × price per unit
+              const reconciliationCost = reconciliationVolume * Number(waterPricing.pricePerUnit);
+
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: waterService.id,
+                  billingPeriodId: currentPeriod.id,
+                  consumption: reconciliationVolume,
+                  costPerUnit: Number(waterPricing.pricePerUnit),
+                  consumptionCost: reconciliationCost,
+                  fixedCost: 0, // No fixed fee on this line
+                  totalUtilityCost: reconciliationCost,
+                  reconciliationId: reconciliation?.id,
+                },
+              });
+              periodBillsCreated++;
+            }
+
+            // 3. Fixed fee record - only if there's a fixed fee
+            if (fixedCost !== 0) {
+              await prisma.utilityBilling.create({
+                data: {
+                  householdId: household.id,
+                  serviceId: waterService.id,
+                  billingPeriodId: currentPeriod.id,
+                  consumption: 0, // No consumption for fixed fee
+                  costPerUnit: 0, // Fixed fee, no per-unit cost
+                  consumptionCost: 0, // No consumption cost
+                  fixedCost: fixedCost,
+                  totalUtilityCost: fixedCost,
+                  reconciliationId: null,
+                },
+              });
+              periodBillsCreated++;
+            }
           }
         }
 
-        // Create membership bill
-        await prisma.utilityBilling.create({
-          data: {
-            householdId: household.id,
-            serviceId: membershipService.id,
-            billingPeriodId: currentPeriod.id,
-            rawConsumption: 0,
-            reconciliationAdjustment: 0,
-            adjustedConsumption: 0,
-            costPerUnit: 0,
-            consumptionCost: 0,
-            fixedFeeShare: Number(membershipPricing.fixedFeePerHousehold),
-            totalUtilityCost: Number(membershipPricing.fixedFeePerHousehold),
-          },
-        });
-        periodBillsCreated++;
+        // Create membership bill - only fixed fee
+        const membershipFixedCost = Number(
+          membershipPricing.fixedFeePerHousehold
+        );
+        if (membershipFixedCost !== 0) {
+          await prisma.utilityBilling.create({
+            data: {
+              householdId: household.id,
+              serviceId: membershipService.id,
+              billingPeriodId: currentPeriod.id,
+              consumption: 0, // No consumption for membership
+              costPerUnit: 0, // Fixed fee, no per-unit cost
+              consumptionCost: 0, // No consumption cost
+              fixedCost: membershipFixedCost,
+              totalUtilityCost: membershipFixedCost,
+              reconciliationId: null,
+            },
+          });
+          periodBillsCreated++;
+        }
       }
 
       totalBillsCreated += periodBillsCreated;

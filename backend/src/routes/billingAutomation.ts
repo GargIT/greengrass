@@ -112,8 +112,7 @@ router.get("/check-readiness/:billingPeriodId", async (req, res, next) => {
       data: readinessData,
     });
   } catch (error) {
-    next(error);
-    return;
+    return next(error);
   }
 });
 

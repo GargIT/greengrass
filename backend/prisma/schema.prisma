@@ -174,12 +174,10 @@ model UtilityBilling {
   serviceId                String                 @map("service_id") @db.Uuid
   reconciliationId         String?                @map("reconciliation_id") @db.Uuid
   billingPeriodId          String                 @map("billing_period_id") @db.Uuid
-  rawConsumption           Decimal                @map("raw_consumption") @db.Decimal(12, 3)
-  reconciliationAdjustment Decimal                @default(0) @map("reconciliation_adjustment") @db.Decimal(10, 3)
-  adjustedConsumption      Decimal                @map("adjusted_consumption") @db.Decimal(12, 3)
+  consumption              Decimal                @map("consumption") @db.Decimal(12, 3)
   costPerUnit              Decimal                @map("cost_per_unit") @db.Decimal(8, 4)
   consumptionCost          Decimal                @map("consumption_cost") @db.Decimal(10, 2)
-  fixedFeeShare            Decimal                @map("fixed_fee_share") @db.Decimal(8, 2)
+  fixedCost                Decimal                @map("fixed_cost") @db.Decimal(8, 2)
   totalUtilityCost         Decimal                @map("total_utility_cost") @db.Decimal(10, 2)
   createdAt                DateTime               @default(now()) @map("created_at")
   billingPeriod            BillingPeriod          @relation(fields: [billingPeriodId], references: [id])

@@ -28,13 +28,11 @@ import {
 
 interface UtilityBilling {
   id: string;
-  rawConsumption: number;
-  reconciliationAdjustment: number;
-  adjustedConsumption: number;
-  costPerUnit: number;
-  consumptionCost: number;
-  fixedFeeShare: number;
-  totalUtilityCost: number;
+  consumption: number; // consumption amount (volume/quantity)
+  costPerUnit: number; // price per unit
+  consumptionCost: number; // variable cost (consumption * costPerUnit)
+  fixedCost: number; // fixed fee cost
+  totalUtilityCost: number; // total cost for this line
   service: {
     id: string;
     name: string;
@@ -319,147 +317,92 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {bill.utilityBillings.map((billing) => (
-                    <React.Fragment key={billing.id}>
-                      {billing.service.serviceType === "WATER" && (
-                        <>
-                          {/* Vatten - Rörlig kostnad */}
-                          <TableRow>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="medium">
-                                {billing.service.name} - Rörlig kostnad
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {Number(billing.rawConsumption).toFixed(1)} m³
-                                {billing.reconciliationAdjustment !== 0 &&
-                                  ` + ${Number(
-                                    billing.reconciliationAdjustment
-                                  ).toFixed(1)} m³ utjämning`}
-                                {billing.reconciliationAdjustment !== 0 &&
-                                  ` = ${Number(
-                                    billing.adjustedConsumption
-                                  ).toFixed(1)} m³`}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              {Number(billing.adjustedConsumption).toFixed(1)}{" "}
-                              {billing.service.unit}
-                            </TableCell>
-                            <TableCell align="right">
-                              {formatCurrency(billing.costPerUnit)}/
-                              {billing.service.unit}
-                            </TableCell>
-                            <TableCell align="right">
-                              <strong>
-                                {formatCurrency(billing.consumptionCost)}
-                              </strong>
-                            </TableCell>
-                            <TableCell align="right">-</TableCell>
-                            <TableCell align="right">
-                              <strong>
-                                {formatCurrency(billing.consumptionCost)}
-                              </strong>
-                            </TableCell>
-                          </TableRow>
+                  {bill.utilityBillings.map((billing) => {
+                    // Simplified logic - each billing line now represents one specific cost type
+                    let lineType = "";
+                    let description = "";
+                    let consumption = "";
+                    let pricePerUnit = "";
+                    let variableCost = "";
+                    let fixedCost = "";
 
-                          {/* Vatten - Fast avgift */}
-                          <TableRow>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="medium">
-                                {billing.service.name} - Fast avgift
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Kvartalsavgift för vattenförsörjning
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">1 st</TableCell>
-                            <TableCell align="right">
-                              {formatCurrency(billing.fixedFeeShare)}/kvartal
-                            </TableCell>
-                            <TableCell align="right">-</TableCell>
-                            <TableCell align="right">
-                              <strong>
-                                {formatCurrency(billing.fixedFeeShare)}
-                              </strong>
-                            </TableCell>
-                            <TableCell align="right">
-                              <strong>
-                                {formatCurrency(billing.fixedFeeShare)}
-                              </strong>
-                            </TableCell>
-                          </TableRow>
-                        </>
-                      )}
+                    // Determine line type based on what's populated
+                    if (Number(billing.fixedCost) !== 0) {
+                      // Fixed fee line
+                      lineType = "Fast avgift";
+                      description = `Fast avgift för ${billing.service.name.toLowerCase()}`;
+                      consumption = "1 st";
+                      pricePerUnit = `${formatCurrency(
+                        billing.fixedCost
+                      )}/kvartal`;
+                      variableCost = "-";
+                      fixedCost = formatCurrency(billing.fixedCost);
+                    } else if (Number(billing.consumptionCost) !== 0) {
+                      // Variable consumption line (including reconciliation)
+                      if (billing.reconciliation) {
+                        lineType = "Utjämning";
+                        description = `Utjämning för ${billing.service.name.toLowerCase()}`;
+                        // For reconciliation, show the consumption volume from the billing record
+                        consumption = `${Number(billing.consumption).toFixed(
+                          1
+                        )} ${billing.service.unit}`;
+                        pricePerUnit = `${formatCurrency(
+                          billing.costPerUnit
+                        )}/${billing.service.unit}`;
+                        // Use the actual consumptionCost from the billing record
+                        variableCost = formatCurrency(billing.consumptionCost);
+                      } else {
+                        lineType = "Rörlig kostnad";
+                        description = `Förbrukning av ${billing.service.name.toLowerCase()}`;
+                        consumption = `${Number(billing.consumption).toFixed(
+                          1
+                        )} ${billing.service.unit}`;
+                        pricePerUnit = `${formatCurrency(
+                          billing.costPerUnit
+                        )}/${billing.service.unit}`;
+                        variableCost = formatCurrency(billing.consumptionCost);
+                      }
+                      fixedCost = "-";
+                    } else {
+                      // Edge case - zero cost line (should not happen normally)
+                      lineType = billing.service.name;
+                      description =
+                        billing.service.description ||
+                        `${billing.service.name.toLowerCase()}`;
+                      consumption = `${Number(billing.consumption).toFixed(
+                        1
+                      )} ${billing.service.unit}`;
+                      pricePerUnit = "-";
+                      variableCost = "-";
+                      fixedCost = "-";
+                    }
 
-                      {billing.service.serviceType === "MEMBERSHIP" && (
-                        <TableRow>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {billing.service.name}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {billing.service.description}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">1 st</TableCell>
-                          <TableCell align="right">
-                            {formatCurrency(billing.fixedFeeShare)}/kvartal
-                          </TableCell>
-                          <TableCell align="right">-</TableCell>
-                          <TableCell align="right">
-                            <strong>
-                              {formatCurrency(billing.totalUtilityCost)}
-                            </strong>
-                          </TableCell>
-                          <TableCell align="right">
-                            <strong>
-                              {formatCurrency(billing.totalUtilityCost)}
-                            </strong>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                      {billing.service.serviceType === "OTHER" && (
-                        <TableRow>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {billing.service.name}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {billing.service.description}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">1 st</TableCell>
-                          <TableCell align="right">
-                            {formatCurrency(billing.fixedFeeShare)}/kvartal
-                          </TableCell>
-                          <TableCell align="right">-</TableCell>
-                          <TableCell align="right">
-                            <strong>
-                              {formatCurrency(billing.totalUtilityCost)}
-                            </strong>
-                          </TableCell>
-                          <TableCell align="right">
-                            <strong>
-                              {formatCurrency(billing.totalUtilityCost)}
-                            </strong>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  ))}
+                    return (
+                      <TableRow key={billing.id}>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="medium">
+                            {billing.service.name} - {lineType}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {description}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">{consumption}</TableCell>
+                        <TableCell align="right">{pricePerUnit}</TableCell>
+                        <TableCell align="right">
+                          <strong>{variableCost}</strong>
+                        </TableCell>
+                        <TableCell align="right">
+                          <strong>{fixedCost}</strong>
+                        </TableCell>
+                        <TableCell align="right">
+                          <strong>
+                            {formatCurrency(billing.totalUtilityCost)}
+                          </strong>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
