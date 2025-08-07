@@ -155,6 +155,48 @@ const Billing: React.FC = () => {
     setPreviewOpen(true);
   };
 
+  const handleMarkAsPaid = async (billId: string) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `/api/billing/quarterly/${billId}/mark-paid`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            paymentDate: new Date().toISOString().split("T")[0],
+            paymentMethod: "manual",
+            notes: "Markerad som betald via admin-gränssnitt",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Kunde inte markera fakturan som betald");
+      }
+
+      const result = await response.json();
+
+      // Show success message
+      setError(null);
+
+      // Refresh data to show updated status
+      await fetchData();
+
+      console.log("Faktura markerad som betald:", result.message);
+    } catch (error) {
+      console.error("Fel vid markering som betald:", error);
+      setError(
+        `Kunde inte markera som betald: ${
+          error instanceof Error ? error.message : "Okänt fel"
+        }`
+      );
+    }
+  };
+
   const handleDownloadPdf = async (billId: string, householdNumber: number) => {
     try {
       const token = localStorage.getItem("accessToken");
@@ -322,8 +364,7 @@ const Billing: React.FC = () => {
               }
               label="Markera som betald"
               onClick={() => {
-                // TODO: Implement payment marking functionality
-                console.log("Mark as paid:", params.row.id);
+                handleMarkAsPaid(params.row.id);
               }}
             />
           );
@@ -491,10 +532,7 @@ const Billing: React.FC = () => {
   };
 
   // Generate bills for a period
-  const generateBills = async (
-    periodId: string,
-    billType: "quarterly" | "monthly"
-  ) => {
+  const generateBills = async (periodId: string, billType: "quarterly") => {
     setBillGenerationLoading(true);
     try {
       const token = localStorage.getItem("accessToken");
@@ -572,7 +610,6 @@ const Billing: React.FC = () => {
         totalDeleted,
         periodName,
         deletedQuarterlyBills,
-        deletedMonthlyBills,
         deletedUtilityBilling,
         deletedUtilityReconciliation,
       } = data.data;
@@ -580,15 +617,12 @@ const Billing: React.FC = () => {
       let message = `Framgångsrikt borttagna ${totalDeleted} poster för period ${periodName}!`;
       if (
         deletedQuarterlyBills > 0 ||
-        deletedMonthlyBills > 0 ||
         deletedUtilityBilling > 0 ||
         deletedUtilityReconciliation > 0
       ) {
         message += `\n\nDetaljer:`;
         if (deletedQuarterlyBills > 0)
           message += `\n• ${deletedQuarterlyBills} periodfakturor`;
-        if (deletedMonthlyBills > 0)
-          message += `\n• ${deletedMonthlyBills} månadsfakturor`;
         if (deletedUtilityBilling > 0)
           message += `\n• ${deletedUtilityBilling} faktureringsposter`;
         if (deletedUtilityReconciliation > 0)
@@ -861,9 +895,12 @@ const Billing: React.FC = () => {
                               <Typography variant="body1">
                                 Generera periodfakturor
                               </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Skapa fakturor för alla {readiness.totalHouseholds}{" "}
-                                hushåll
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Skapa fakturor för alla{" "}
+                                {readiness.totalHouseholds} hushåll
                               </Typography>
                             </Box>
                           </Stack>
@@ -877,12 +914,15 @@ const Billing: React.FC = () => {
                                 window.confirm(
                                   `Är du säker på att du vill ta bort ALL faktureringsdata för period ${
                                     periods.find(
-                                      (p) => p.id === selectedPeriodForGeneration
+                                      (p) =>
+                                        p.id === selectedPeriodForGeneration
                                     )?.periodName || "vald period"
-                                  }?\n\nDetta kommer att ta bort:\n• Fakturor (quarterly/monthly)\n• Faktureringsposter (utility_billing)\n• Avstämningar (utility_reconciliation)\n\nDetta kan inte ångras!`
+                                  }?\n\nDetta kommer att ta bort:\n• Periodfakturor\n• Faktureringsposter (utility_billing)\n• Avstämningar (utility_reconciliation)\n\nDetta kan inte ångras!`
                                 )
                               ) {
-                                deleteBillsForPeriod(selectedPeriodForGeneration);
+                                deleteBillsForPeriod(
+                                  selectedPeriodForGeneration
+                                );
                               }
                             }}
                             disabled={billDeletionLoading}

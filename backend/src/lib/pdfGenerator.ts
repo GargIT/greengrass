@@ -148,80 +148,11 @@ export class PDFGenerator {
   }
 
   /**
-   * Generate PDF invoice for a monthly bill
-   */
-  public static async generateMonthlyBillPDF(billId: string): Promise<Buffer> {
-    try {
-      // Fetch bill data with all relations
-      const bill = await prisma.monthlyBill.findUnique({
-        where: { id: billId },
-        include: {
-          household: true,
-          billingPeriod: true,
-        },
-      });
-
-      if (!bill) {
-        throw new Error("Monthly bill not found");
-      }
-
-      // Get detailed utility billing breakdown
-      const utilityBillings = await prisma.utilityBilling.findMany({
-        where: {
-          householdId: bill.householdId,
-          billingPeriodId: bill.billingPeriodId,
-        },
-        include: {
-          service: true,
-        },
-        orderBy: {
-          service: { serviceType: "asc" },
-        },
-      });
-
-      // Format data for template
-      const billData: BillData = {
-        id: bill.id,
-        billNumber: this.generateBillNumber(bill),
-        householdNumber: bill.household.householdNumber,
-        householdOwner: bill.household.ownerName,
-        householdAddress: bill.household.address || "Gröngräset",
-        billingPeriodName: bill.billingPeriod.periodName,
-        startDate: bill.billingPeriod.startDate,
-        endDate: bill.billingPeriod.endDate,
-        dueDate: bill.dueDate,
-        memberFee: 0, // Monthly bills don't include member fees
-        totalUtilityCosts: Number(bill.totalUtilityCosts),
-        sharedCosts: 0, // Monthly bills don't include shared costs
-        totalAmount: Number(bill.totalAmount),
-        status: bill.status,
-        utilityBillings: utilityBillings.map((ub) => ({
-          serviceName: ub.service.name,
-          serviceType: ub.service.serviceType,
-          consumption: Number(ub.consumption),
-          unit: ub.service.unit,
-          pricePerUnit: Number(ub.costPerUnit),
-          fixedFee: Number(ub.fixedCost),
-          variableCost: Number(ub.consumptionCost),
-          totalCost: Number(ub.totalUtilityCost),
-          meterReading: Number(ub.consumption), // Using consumption as meter reading
-          previousReading: 0, // Simplified - not calculated anymore
-        })),
-      };
-
-      return await this.generatePDF(billData, "monthly");
-    } catch (error) {
-      console.error("Error generating monthly bill PDF:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Generate the actual PDF using Puppeteer
    */
   private static async generatePDF(
     billData: BillData,
-    billType: "quarterly" | "monthly"
+    billType: "quarterly"
   ): Promise<Buffer> {
     const browser = await this.getBrowser();
     const page = await browser.newPage();
@@ -256,7 +187,7 @@ export class PDFGenerator {
    */
   private static generateInvoiceHTML(
     billData: BillData,
-    billType: "quarterly" | "monthly"
+    billType: "quarterly"
   ): string {
     const formatCurrency = (amount: number) =>
       new Intl.NumberFormat("sv-SE", {

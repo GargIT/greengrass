@@ -13,9 +13,6 @@ async function resetData() {
     console.log("Deleting quarterly bills...");
     await prisma.quarterlyBill.deleteMany();
 
-    console.log("Deleting monthly bills...");
-    await prisma.monthlyBill.deleteMany();
-
     console.log("Deleting payments...");
     await prisma.payment.deleteMany();
 

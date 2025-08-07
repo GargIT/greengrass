@@ -21,10 +21,6 @@ router.get("/dashboard", async (req, res, next) => {
       where: { status: "pending" },
     });
 
-    const pendingMonthlyBills = await prisma.monthlyBill.count({
-      where: { status: "pending" },
-    });
-
     // Get total revenue for current year
     const quarterlyRevenue = await prisma.quarterlyBill.aggregate({
       where: {
@@ -37,20 +33,7 @@ router.get("/dashboard", async (req, res, next) => {
       _sum: {
         totalAmount: true,
       },
-    });
-
-    const monthlyRevenue = await prisma.monthlyBill.aggregate({
-      where: {
-        createdAt: {
-          gte: new Date(currentYear, 0, 1),
-          lt: new Date(currentYear + 1, 0, 1),
-        },
-        status: "paid",
-      },
-      _sum: {
-        totalAmount: true,
-      },
-    });
+    });    
 
     // Get active utility services
     const activeServices = await prisma.utilityService.count({
@@ -92,10 +75,8 @@ router.get("/dashboard", async (req, res, next) => {
         overview: {
           totalHouseholds,
           activeServices,
-          pendingBills: pendingQuarterlyBills + pendingMonthlyBills,
-          totalRevenue:
-            Number(quarterlyRevenue._sum.totalAmount || 0) +
-            Number(monthlyRevenue._sum.totalAmount || 0),
+          pendingBills: pendingQuarterlyBills,
+          totalRevenue: Number(quarterlyRevenue._sum.totalAmount || 0),
         },
         recentReadings,
       },
@@ -223,96 +204,54 @@ router.get("/billing/:periodId", async (req, res, next) => {
       });
     }
 
-    if (type === "quarterly") {
-      const bills = await prisma.quarterlyBill.findMany({
-        where: { billingPeriodId: periodId },
-        include: {
-          household: {
-            select: {
-              id: true,
-              householdNumber: true,
-              ownerName: true,
-              email: true,
-              // andelstal field removed - using equal shares (1/14) for all
-            },
+    const bills = await prisma.quarterlyBill.findMany({
+      where: { billingPeriodId: periodId },
+      include: {
+        household: {
+          select: {
+            id: true,
+            householdNumber: true,
+            ownerName: true,
+            email: true,
+            // andelstal field removed - using equal shares (1/14) for all
           },
-          payments: true,
         },
-        orderBy: { household: { householdNumber: "asc" } },
-      });
+        payments: true,
+      },
+      orderBy: { household: { householdNumber: "asc" } },
+    });
 
-      const summary = {
-        totalBills: bills.length,
-        totalAmount: bills.reduce(
-          (sum, bill) => sum + Number(bill.totalAmount),
-          0
-        ),
-        totalUtilityCosts: bills.reduce(
-          (sum, bill) => sum + Number(bill.totalUtilityCosts),
-          0
-        ),
-        totalMemberFees: bills.reduce(
-          (sum, bill) => sum + Number(bill.memberFee),
-          0
-        ),
-        totalSharedCosts: bills.reduce(
-          (sum, bill) => sum + Number(bill.sharedCosts),
-          0
-        ),
-        paidBills: bills.filter((bill) => bill.status === "paid").length,
-        pendingBills: bills.filter((bill) => bill.status === "pending").length,
-        overdueBills: bills.filter((bill) => bill.status === "overdue").length,
-      };
+    const summary = {
+      totalBills: bills.length,
+      totalAmount: bills.reduce(
+        (sum, bill) => sum + Number(bill.totalAmount),
+        0
+      ),
+      totalUtilityCosts: bills.reduce(
+        (sum, bill) => sum + Number(bill.totalUtilityCosts),
+        0
+      ),
+      totalMemberFees: bills.reduce(
+        (sum, bill) => sum + Number(bill.memberFee),
+        0
+      ),
+      totalSharedCosts: bills.reduce(
+        (sum, bill) => sum + Number(bill.sharedCosts),
+        0
+      ),
+      paidBills: bills.filter((bill) => bill.status === "paid").length,
+      pendingBills: bills.filter((bill) => bill.status === "pending").length,
+      overdueBills: bills.filter((bill) => bill.status === "overdue").length,
+    };
 
-      return res.json({
-        success: true,
-        data: {
-          billingPeriod,
-          bills,
-          summary,
-        },
-      });
-    } else {
-      const bills = await prisma.monthlyBill.findMany({
-        where: { billingPeriodId: periodId },
-        include: {
-          household: {
-            select: {
-              id: true,
-              householdNumber: true,
-              ownerName: true,
-              email: true,
-            },
-          },
-          payments: true,
-        },
-        orderBy: { household: { householdNumber: "asc" } },
-      });
-
-      const summary = {
-        totalBills: bills.length,
-        totalAmount: bills.reduce(
-          (sum, bill) => sum + Number(bill.totalAmount),
-          0
-        ),
-        totalUtilityCosts: bills.reduce(
-          (sum, bill) => sum + Number(bill.totalUtilityCosts),
-          0
-        ),
-        paidBills: bills.filter((bill) => bill.status === "paid").length,
-        pendingBills: bills.filter((bill) => bill.status === "pending").length,
-        overdueBills: bills.filter((bill) => bill.status === "overdue").length,
-      };
-
-      return res.json({
-        success: true,
-        data: {
-          billingPeriod,
-          bills,
-          summary,
-        },
-      });
-    }
+    return res.json({
+      success: true,
+      data: {
+        billingPeriod,
+        bills,
+        summary,
+      },
+    });
   } catch (error) {
     next(error);
     return;
@@ -343,29 +282,11 @@ router.get("/payments", async (req, res, next) => {
           lt: endDate,
         },
         ...(householdId && {
-          OR: [
-            { quarterlyBill: { householdId: householdId as string } },
-            { monthlyBill: { householdId: householdId as string } },
-          ],
+          OR: [{ quarterlyBill: { householdId: householdId as string } }],
         }),
       },
       include: {
         quarterlyBill: {
-          include: {
-            household: {
-              select: {
-                householdNumber: true,
-                ownerName: true,
-              },
-            },
-            billingPeriod: {
-              select: {
-                periodName: true,
-              },
-            },
-          },
-        },
-        monthlyBill: {
           include: {
             household: {
               select: {
@@ -391,7 +312,6 @@ router.get("/payments", async (req, res, next) => {
         0
       ),
       quarterlyPayments: payments.filter((p) => p.quarterlyBillId).length,
-      monthlyPayments: payments.filter((p) => p.monthlyBillId).length,
     };
 
     res.json({

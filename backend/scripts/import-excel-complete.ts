@@ -154,9 +154,6 @@ async function importExcelDataComplete() {
     await prisma.payment.deleteMany({});
     console.log("✅ Cleared payments");
 
-    await prisma.monthlyBill.deleteMany({});
-    console.log("✅ Cleared monthly bills");
-
     await prisma.quarterlyBill.deleteMany({});
     console.log("✅ Cleared quarterly bills");
 

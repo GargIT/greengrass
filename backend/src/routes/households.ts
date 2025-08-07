@@ -30,7 +30,6 @@ router.get("/", async (req, res, next) => {
         _count: {
           select: {
             quarterlyBills: true,
-            monthlyBills: true,
           },
         },
       },
@@ -64,10 +63,6 @@ router.get("/:id", async (req, res, next) => {
           },
         },
         quarterlyBills: {
-          take: 10,
-          orderBy: { createdAt: "desc" },
-        },
-        monthlyBills: {
           take: 10,
           orderBy: { createdAt: "desc" },
         },
