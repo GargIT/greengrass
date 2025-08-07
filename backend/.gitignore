@@ -42,3 +42,7 @@ prisma/migrations/
 # Test files
 *.test.js
 *.test.ts
+
+# Core dumps
+core
+core.*

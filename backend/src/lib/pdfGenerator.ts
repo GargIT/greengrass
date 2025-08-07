@@ -411,6 +411,7 @@ export class PDFGenerator {
         
         .summary-table .label {
             background-color: #f5f5f5;
+            color: #333;
             font-weight: bold;
             text-align: right;
         }
@@ -553,11 +554,6 @@ export class PDFGenerator {
                 <tr>
                     <td>
                         <strong>${utility.serviceName}</strong>
-                        ${
-                          utility.meterReading
-                            ? `<br><small>Mätarställning: ${utility.previousReading} → ${utility.meterReading}</small>`
-                            : ""
-                        }
                     </td>
                     <td>${utility.consumption.toFixed(2)}</td>
                     <td>${utility.unit}</td>
@@ -581,38 +577,6 @@ export class PDFGenerator {
         
         <!-- Summary -->
         <table class="summary-table">
-            ${
-              billData.utilityBillings.length > 0
-                ? `
-            <tr>
-                <td class="label">Summa VA/El/Värme:</td>
-                <td class="amount">${formatCurrency(
-                  billData.totalUtilityCosts
-                )}</td>
-            </tr>
-            `
-                : ""
-            }
-            ${
-              billType === "quarterly" && billData.memberFee > 0
-                ? `
-            <tr>
-                <td class="label">Medlemsavgift:</td>
-                <td class="amount">${formatCurrency(billData.memberFee)}</td>
-            </tr>
-            `
-                : ""
-            }
-            ${
-              billType === "quarterly" && billData.sharedCosts > 0
-                ? `
-            <tr>
-                <td class="label">Gemensamma kostnader:</td>
-                <td class="amount">${formatCurrency(billData.sharedCosts)}</td>
-            </tr>
-            `
-                : ""
-            }
             <tr class="total-row">
                 <td class="label">TOTALT ATT BETALA:</td>
                 <td class="amount">${formatCurrency(billData.totalAmount)}</td>

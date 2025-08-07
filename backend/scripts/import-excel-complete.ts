@@ -22,16 +22,16 @@ function calculateTertiaryPeriod(readingDate: Date): {
 
   if (month >= 1 && month <= 4) {
     // Period 1: January - April
-    startDate = new Date(year, 0, 1); // January 1
-    endDate = new Date(year, 3, 30); // April 30
+    startDate = new Date(Date.UTC(year, 0, 1)); // January 1
+    endDate = new Date(Date.UTC(year, 3, 30)); // April 30
   } else if (month >= 5 && month <= 8) {
     // Period 2: May - August
-    startDate = new Date(year, 4, 1); // May 1
-    endDate = new Date(year, 7, 31); // August 31
+    startDate = new Date(Date.UTC(year, 4, 1)); // May 1
+    endDate = new Date(Date.UTC(year, 7, 31)); // August 31
   } else {
     // Period 3: September - December
-    startDate = new Date(year, 8, 1); // September 1
-    endDate = new Date(year, 11, 31); // December 31
+    startDate = new Date(Date.UTC(year, 8, 1)); // September 1
+    endDate = new Date(Date.UTC(year, 11, 31)); // December 31
   }
 
   // Reading deadline is 2 weeks before period end
@@ -374,9 +374,15 @@ async function importExcelDataComplete() {
         try {
           let readingDate: Date;
           if (typeof row[0] === "number") {
-            readingDate = new Date((row[0] - 25569) * 86400 * 1000);
+            // Convert Excel date to UTC at noon to avoid timezone issues
+            const excelDate = row[0];
+            const utcTimestamp = (excelDate - 25569) * 86400 * 1000;
+            readingDate = new Date(utcTimestamp);
+            // Set to noon UTC to avoid day boundary issues
+            readingDate.setUTCHours(12, 0, 0, 0);
           } else {
             readingDate = new Date(row[0]);
+            readingDate.setUTCHours(12, 0, 0, 0);
           }
 
           // Skip invalid dates or dates before year 2000
@@ -464,9 +470,11 @@ async function importExcelDataComplete() {
       if (typeof row[0] !== "number") continue;
 
       try {
-        // Parse date
+        // Parse date with UTC noon to avoid timezone issues
         const excelDate = row[0];
-        const readingDate = new Date((excelDate - 25569) * 86400 * 1000);
+        const utcTimestamp = (excelDate - 25569) * 86400 * 1000;
+        const readingDate = new Date(utcTimestamp);
+        readingDate.setUTCHours(12, 0, 0, 0);
 
         // Skip invalid dates
         if (!readingDate || isNaN(readingDate.getTime())) {
@@ -770,14 +778,16 @@ async function importExcelDataComplete() {
         console.log(`⏭️  Skipping future period: ${currentPeriod.periodName}`);
         continue;
       }
-      
+
       // Also check if we have any meter readings for this period
       const hasReadings = await prisma.householdMeterReading.count({
         where: { billingPeriodId: currentPeriod.id },
       });
-      
+
       if (hasReadings === 0) {
-        console.log(`📊 Skipping ${currentPeriod.periodName} - no meter readings found`);
+        console.log(
+          `📊 Skipping ${currentPeriod.periodName} - no meter readings found`
+        );
         continue;
       }
 
@@ -867,9 +877,10 @@ async function importExcelDataComplete() {
               const reconciliationVolume = reconciliation
                 ? Number(reconciliation.adjustmentPerHousehold)
                 : adjustment / Number(waterPricing.pricePerUnit);
-              
+
               // Calculate the correct cost: volume × price per unit
-              const reconciliationCost = reconciliationVolume * Number(waterPricing.pricePerUnit);
+              const reconciliationCost =
+                reconciliationVolume * Number(waterPricing.pricePerUnit);
 
               await prisma.utilityBilling.create({
                 data: {
@@ -1082,9 +1093,11 @@ async function createBillingPeriodsFromMainMeters(workbook: any) {
     if (typeof row[0] !== "number") continue;
 
     try {
-      // Parse date
+      // Parse date with UTC noon to avoid timezone issues
       const excelDate = row[0];
-      const readingDate = new Date((excelDate - 25569) * 86400 * 1000);
+      const utcTimestamp = (excelDate - 25569) * 86400 * 1000;
+      const readingDate = new Date(utcTimestamp);
+      readingDate.setUTCHours(12, 0, 0, 0);
 
       // Skip invalid dates or dates before year 2000
       if (
