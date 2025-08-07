@@ -16,12 +16,13 @@
     "@mui/material": "^7.2.0",
     "@mui/x-data-grid": "^8.9.2",
     "@mui/x-date-pickers": "^8.9.2",
+    "@types/recharts": "^1.8.29",
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
-    "recharts": "^3.1.0",
+    "recharts": "^3.1.2",
     "zod": "^4.0.14"
   },
   "devDependencies": {

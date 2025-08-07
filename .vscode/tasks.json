@@ -42,18 +42,62 @@
         "clear": true
       },
       "problemMatcher": {
+        "owner": "typescript",
+        "source": "tsx",
+        "fileLocation": ["relative", "${workspaceFolder}/backend"],
         "pattern": [
           {
-            "regexp": ".",
+            "regexp": "^(.*):(\\d+):(\\d+)\\s+-\\s+(error|warning|info)\\s+(.*)$",
             "file": 1,
-            "location": 2,
-            "message": 3
+            "line": 2,
+            "column": 3,
+            "severity": 4,
+            "message": 5
           }
         ],
         "background": {
           "activeOnStart": true,
-          "beginsPattern": ".*rerunning.*",
-          "endsPattern": ".*Local:.*|.*listening on port.*"
+          "beginsPattern": ".*rerunning.*|.*tsx.*",
+          "endsPattern": ".*Local:.*|.*listening on port.*|.*ready.*"
+        }
+      }
+    },
+    {
+      "label": "dev-backend-nodemon",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev:nodemon"],
+      "group": "build",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "typescript",
+        "source": "nodemon",
+        "fileLocation": ["relative", "${workspaceFolder}/backend"],
+        "pattern": [
+          {
+            "regexp": "^(.*):(\\d+):(\\d+)\\s+-\\s+(error|warning|info)\\s+(.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "severity": 4,
+            "message": 5
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*starting.*|.*restarting.*",
+          "endsPattern": ".*Local:.*|.*listening on port.*|.*ready.*"
         }
       }
     },

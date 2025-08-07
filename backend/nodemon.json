@@ -1,0 +1,12 @@
+{
+  "watch": ["src"],
+  "ext": "ts,js,json",
+  "ignore": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"],
+  "exec": "ts-node --transpile-only src/index.ts",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "verbose": true,
+  "restartable": "rs",
+  "delay": 1000
+}
