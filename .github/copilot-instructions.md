@@ -114,6 +114,16 @@ cd backend && npm install && npx prisma generate && npx prisma db push
 npm test          # Backend unit tests (from backend/)
 ```
 
+### Terminal Usage for AI Agents
+
+```bash
+# For clean output parsing (no colors, minimal prompt):
+PS1="$ " bash --rcfile /dev/null -c "command_here"
+
+# User's normal terminal uses default "bash" profile
+# AI-friendly "copilot-terminal" profile available but use explicit commands for reliability
+```
+
 ## Project-Specific Conventions
 
 ### File Organization

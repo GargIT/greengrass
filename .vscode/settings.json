@@ -53,5 +53,32 @@
   "git.autofetch": true,
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
-  "extensions.ignoreRecommendations": false
+  "extensions.ignoreRecommendations": false,
+
+  // Terminal configuration for better AI readability (without affecting your normal terminals)
+  "terminal.integrated.scrollback": 10000,
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.showExitAlert": false,
+  "terminal.integrated.confirmOnExit": "never",
+  "terminal.integrated.enableVisualBell": false,
+  "terminal.integrated.shellIntegration.decorationsEnabled": "never",
+  "terminal.integrated.shellIntegration.history": 1000,
+  "terminal.integrated.suppressApplicationTitle": true,
+
+  // Create a separate AI-friendly terminal profile (fontSize stays normal for you)
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "bash",
+      "icon": "terminal-bash"
+    },
+    "copilot-terminal": {
+      "path": "bash",
+      "args": ["--noprofile", "--norc"],
+      "env": {
+        "PS1": "$ "
+      },
+      "icon": "robot",
+      "overrideName": true
+    }
+  }
 }
