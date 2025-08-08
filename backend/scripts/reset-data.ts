@@ -10,8 +10,8 @@ async function resetData() {
     console.log("Deleting utility billing...");
     await prisma.utilityBilling.deleteMany();
 
-    console.log("Deleting quarterly bills...");
-    await prisma.quarterlyBill.deleteMany();
+    console.log("Deleting invoices...");
+    await prisma.invoice.deleteMany();
 
     console.log("Deleting payments...");
     await prisma.payment.deleteMany();

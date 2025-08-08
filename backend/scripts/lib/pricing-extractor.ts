@@ -24,6 +24,12 @@ export async function extractPricingHistoryFromExcel(): Promise<{
     const excelPath = "../Gröngräset.xlsx";
     const workbook = XLSX.readFile(excelPath);
 
+    // Determine number of households dynamically from sheet names like "Gräsv.<number>"
+    const householdSheetCount = workbook.SheetNames.filter((name) =>
+      /^Gräsv\.\d+$/.test(name)
+    ).length;
+    const householdsCount = Math.max(1, householdSheetCount || 0);
+
     // Extract pricing from "Huvud mätare" sheet
     const mainSheet = workbook.Sheets["Huvud mätare"];
     const mainData = XLSX.utils.sheet_to_json(mainSheet, { header: 1 });
@@ -83,9 +89,9 @@ export async function extractPricingHistoryFromExcel(): Promise<{
         const fastAvgPerHousehold = row[fastAvgPerHouseholdCol];
         const medlemsAvgTotal = row[medlemsAvgCol];
 
-        // Calculate medlemsavgift per household (divide by 14)
+        // Calculate medlemsavgift per household using dynamic household count
         const medlemsAvgPerHousehold = medlemsAvgTotal
-          ? Number(medlemsAvgTotal) / 14
+          ? Number(medlemsAvgTotal) / householdsCount
           : null;
 
         if (
@@ -144,7 +150,7 @@ export async function extractPricingHistoryFromExcel(): Promise<{
           effectiveDate,
           pricePerUnit: 0,
           fixedFeePerHousehold: sample.medlemsAvgPerHousehold,
-          notes: `Membership fee from ${effectiveDate} (${sample.medlemsAvgTotal} kr total / 14 households)`,
+          notes: `Membership fee from ${effectiveDate} (${sample.medlemsAvgTotal} kr total / ${householdsCount} households)`,
         });
       }
     });

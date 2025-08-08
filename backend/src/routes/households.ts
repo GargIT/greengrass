@@ -168,7 +168,7 @@ router.delete("/:id", async (req, res, next) => {
 });
 
 /**
- * Calculate ownership ratios for equal shares (deprecated - using 1/14 for all)
+ * Calculate equal share ratio dynamically (no persisted andelstal)
  * Each household gets an equal share: 1 / total_active_households
  */
 async function updateOwnershipRatios() {
@@ -182,14 +182,14 @@ async function updateOwnershipRatios() {
       return;
     }
 
-    // Calculate equal ratio for each household (but don't update since andelstal field is removed)
+    // Calculate equal ratio for each household (computed on-the-fly elsewhere)
     const newRatio = 1 / activeHouseholdCount;
 
-    // Note: andelstal field removed from schema - using equal shares (1/14) for all households
+    // andelstal field removed from schema - equal shares computed dynamically (1/N)
     console.log(
       `Equal ownership ratios: ${activeHouseholdCount} households, ${newRatio.toFixed(
         8
-      )} each (hardcoded to 1/14)`
+      )} each`
     );
   } catch (error) {
     console.error("Error calculating ownership ratios:", error);
@@ -197,7 +197,7 @@ async function updateOwnershipRatios() {
   }
 }
 
-// PUT /api/households/recalculate-ratios - Admin endpoint to recalculate ownership ratios
+// PUT /api/households/recalculate-ratios - Admin endpoint to confirm equal shares
 router.put("/recalculate-ratios", async (req, res, next) => {
   try {
     await updateOwnershipRatios();
@@ -208,17 +208,18 @@ router.put("/recalculate-ratios", async (req, res, next) => {
         id: true,
         householdNumber: true,
         ownerName: true,
-        // andelstal field removed - using equal shares (1/14) for all
+        // andelstal field removed - equal shares computed dynamically (1/N)
       },
     });
 
+    const count = activeHouseholds.length;
+
     res.json({
       success: true,
-      message:
-        "Equal ownership shares confirmed (1/14 for all active households)",
+      message: "Equal ownership shares confirmed for active households",
       data: {
-        totalActiveHouseholds: activeHouseholds.length,
-        newRatio: activeHouseholds.length > 0 ? 1 / 14 : null, // Equal shares
+        totalActiveHouseholds: count,
+        newRatio: count > 0 ? 1 / count : null, // Equal shares (1/N)
         households: activeHouseholds,
       },
     });

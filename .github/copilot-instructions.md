@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Swedish samfällighetsförening (joint facility association) utility billing system. Replaces Excel-based billing with a modern React/TypeScript web app supporting 14 households with equal shares, quarterly/monthly billing, and role-based access.
+Swedish samfällighetsförening (joint facility association) utility billing system. Replaces Excel-based billing with a modern React/TypeScript web app supporting a dynamic number of households with equal shares, tertiary (3x/year) billing, and role-based access.
 
 ## Architecture & Technology Stack
 
@@ -63,14 +63,14 @@ const validatedData = schema.parse(req.body); // Throws ZodError on failure
 
 ## Key Business Logic
 
-### Household Model (14 Equal Shares)
+### Household Model (Equal Shares)
 
-- Each active household gets 1/14 share (andelstal removed - equal distribution)
-- Households identified by `householdNumber` (1-14), not by ownership percentages
+- Each active household gets an equal share (andelstal removed - equal distribution)
+- Households identified by `householdNumber`, not by ownership percentages
 
 ### Billing System Architecture
 
-- **Quarterly Bills**: Official billing periods with member fees (1000 SEK/quarter) + utilities + shared costs
+- **Invoices per Tertiary Periods**: Official billing periods every 4 months with member fees + utilities + shared costs
 - **Service Types**: `WATER|ELECTRICITY|HEATING|INTERNET|MEMBERSHIP|OTHER`
 - **Reconciliation**: Main meters vs household meters for services like water
 - **Volume-based Billing**: All utility costs based on volume (m³) with reconciliation adjustments as separate line items
@@ -80,7 +80,7 @@ const validatedData = schema.parse(req.body); // Throws ZodError on failure
 ```
 Household 1:N HouseholdMeter M:1 UtilityService
 Household 1:N MeterReading (via HouseholdMeter)
-BillingPeriod 1:N QuarterlyBill M:1 Household
+BillingPeriod 1:N Invoice M:1 Household
 UtilityService 1:N UtilityPricing (historical pricing)
 ```
 
@@ -180,7 +180,7 @@ import { prisma } from "../lib/prisma";
 ## Current Development Status
 
 - ✅ Complete backend API with role-based access
-- ✅ Full quarterly billing system (monthly billing removed for simplicity)
+- ✅ Full tertiary billing system (monthly billing removed for simplicity)
 - ✅ Member vs Admin UI differences implemented
 - ✅ Historical data import from Excel completed
 - ✅ PDF invoice generation with polished output

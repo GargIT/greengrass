@@ -1,5 +1,7 @@
 # Gröngräset - Samfällighetsförening Utility Billing System
 
+> Important update (August 2025): The system now supports a dynamic number of households with equal shares by default and uses tertiary billing periods (3x/year, every 4 months). Any older references to “14 households” or “quarterly” in this document are legacy and will be phased out; functionality and code have been refactored accordingly.
+
 **File:** Gröngräset.xlsx  
 **Context:** Swedish Joint Facility Association (Samfällighetsförening) - Multi-Utility Billing Platform  
 **Purpose:** Modern React/TypeScript web application for utility billing, member management, and financial tracking
@@ -39,16 +41,16 @@
 
 #### Core Data Management
 
-- ✅ **Household Management**: 14 households with equal shares (andelstal removed)
+- ✅ **Household Management**: Dynamic households with equal shares (andelstal removed)
 - ✅ **Utility Services**: Configurable services (Water, Electricity, Gas, etc.)
 - ✅ **Meter Management**: Both household meters and main meters
 - ✅ **Meter Readings**: Full CRUD with consumption calculations
-- ✅ **Billing Periods**: Quarterly period support (monthly billing removed for simplicity)
+- ✅ **Billing Periods**: Tertiary period support (3x/year, monthly removed)
 - ✅ **Role-based Data Access**: Members only see their own data
 
 #### Complete Billing System ✅ REFINED
 
-- ✅ **Quarterly-Only Billing Engine**: Simplified to quarterly periods only
+- ✅ **Tertiary-Only Billing Engine**: Simplified to 3 periods per year
 - ✅ **Volume-based Billing**: All utility costs based on m³ consumption
 - ✅ **Reconciliation System**: Main vs household meter reconciliation as separate line items
 - ✅ **Historical Data Import**: Complete Excel import with UTC date handling
@@ -70,7 +72,7 @@
   - **ADMIN**: Full access to all households and main meters
   - **MEMBER**: Simplified view - only their own household meters
 - ✅ **User Management**: Admin interface for user/household linking
-- ✅ **Billing Interface**: Complete quarterly billing dashboard with mark-as-paid functionality ✅ REFINED
+- ✅ **Billing Interface**: Complete tertiary billing dashboard with mark-as-paid functionality ✅ REFINED
 
 #### User Experience
 
@@ -80,7 +82,7 @@
 - ✅ **Error Handling**: Comprehensive error handling and user feedback
 - ✅ **Professional Billing GUI**: Invoice preview with service breakdown ✅ REFINED
 - ✅ **Swedish Localization**: Proper currency and date formatting ✅ REFINED
-- ✅ **Quarterly-Only Focus**: Simplified UI focusing on quarterly billing periods
+- ✅ **Tertiary-Only Focus**: Simplified UI focusing on tertiary billing periods
 
 ### 🏗️ CURRENT ARCHITECTURE
 
@@ -95,12 +97,12 @@
 #### Database Schema (PostgreSQL)
 
 - **Users**: Authentication and role management
-- **Households**: 14 households with owner information
+- **Households**: Dynamic households with owner information
 - **UtilityServices**: Configurable services (Water, Electricity, etc.)
 - **HouseholdMeters**: Individual meters per household per service
 - **MainMeters**: Main meters for reconciliation
 - **MeterReadings**: Both household and main meter readings
-- **BillingPeriods**: Quarterly billing cycles (monthly billing removed)
+- **BillingPeriods**: Tertiary billing cycles (3x/year)
 
 #### API Endpoints
 
@@ -111,53 +113,53 @@
 - ✅ `/api/household-meters/*` - Household meter management
 - ✅ `/api/main-meters/*` - Main meter management
 - ✅ `/api/meter-readings/*` - Reading management with role restrictions
-- ✅ `/api/billing/*` - Quarterly billing periods and bill details with mark-as-paid functionality
+- ✅ `/api/billing/*` - Tertiary billing periods and bill details with mark-as-paid functionality
 
 #### 🏗️ CURRENT ARCHITECTURE UPDATES
 
 **Latest Backend Additions:**
 
-- Complete quarterly-only utility billing system with volume-based calculations
+- Complete tertiary-only utility billing system with volume-based calculations
 - Historical data import with UTC date handling and pricing extraction
 - Reconciliation algorithms for main vs household meters as separate line items
-- Quarterly bill generation with detailed breakdown and clear field naming
+- Tertiary bill generation with detailed breakdown and clear field naming
 - Mark-as-paid functionality with payment tracking
 - Enhanced billing API with mark-as-paid endpoints
 
 **Latest Frontend Additions:**
 
-- Professional quarterly billing dashboard with mark-as-paid functionality
+- Professional tertiary billing dashboard with mark-as-paid functionality
 - Detailed bill preview dialog with service breakdown and reconciliation details
 - Proper handling of membership fees as separate service
 - Swedish currency formatting and date localization
-- Material-UI optimized responsive design focused on quarterly billing
+- Material-UI optimized responsive design focused on tertiary billing
 - Clean removal of monthly billing UI components
 
 ### 🎯 DEVELOPMENT PROGRESS & TODO LIST
 
 #### ✅ RECENTLY COMPLETED (August 2025)
 
-##### 1. 🧹 **Quarterly-Only Billing System Refinement**
+##### 1. 🧹 **Tertiary-Only Billing System Refinement**
 
 - ✅ Removed all monthly billing logic from backend, frontend, and database
-- ✅ Simplified billing system to focus on quarterly periods only
+- ✅ Simplified billing system to focus on tertiary periods only
 - ✅ Refactored field names for clarity (billedAmount, reconciliationCost, etc.)
 - ✅ Ensured all reconciliation adjustments are separate invoice line items
 - ✅ Volume-based billing (m³) for all utility services
 - ✅ UTC date handling to prevent timezone issues in import script
 
-##### 2. 💰 **Complete Quarterly Billing Implementation**
+##### 2. 💰 **Complete Tertiary Billing Implementation**
 
 - ✅ Enhanced PATCH endpoint for marking bills as paid
 - ✅ Complete Excel data import with historical pricing and UTC dates
 - ✅ Utility billing calculations for water and membership
-- ✅ Generate quarterly bills with all service types
+- ✅ Generate tertiary bills with all service types
 - ✅ Reconciliation between main and household meters as separate line items
 - ✅ All historical bills generated and payment tracking implemented
 
 ##### 3. 🎨 **Refined Frontend Billing Interface**
 
-- ✅ Complete Billing page with quarterly bill overview only
+- ✅ Complete Billing page with tertiary bill overview only
 - ✅ BillPreview component with detailed invoice breakdown
 - ✅ Mark-as-paid functionality wired up with backend
 - ✅ Separate billing rows for variable and fixed costs
@@ -296,7 +298,7 @@
 #### 3. Cost Categories (Multi-Utility Samfällighetsförening)
 
 - **Utility consumption billing** ("konsumtion") - Individual metered usage (water, electricity, gas)
-- **Shared costs** ("gemensamma kostnader") - Split equally between 14 households
+- **Shared costs** ("gemensamma kostnader") - Split equally between households
 - **Member fees** ("medlemsavgift") - 3000 SEK/year per household
 - **Administrative costs** ("administration")
 - **Reserve fund** ("reservfond")
@@ -591,12 +593,12 @@ Database (PostgreSQL)
 
 ### Phase 3: Financial Features ✅ COMPLETED (August 2025)
 
-- ✅ Implement complete quarterly billing calculation logic
-- ✅ Build automatic quarterly bill generation with mark-as-paid functionality
+- ✅ Implement complete tertiary billing calculation logic
+- ✅ Build automatic tertiary bill generation with mark-as-paid functionality
 - ✅ Create reconciliation algorithms (main vs household meters) as separate line items
 - ✅ Add volume-based utility billing with membership service integration
 - ✅ Implement shared costs allocation framework
-- ✅ Build quarterly bill reporting system with PDF generation
+- ✅ Build tertiary bill reporting system with PDF generation
 - ✅ Add historical data import and pricing management with UTC date handling
 - ✅ Polish PDF invoice output for professional appearance
 
@@ -1220,7 +1222,7 @@ Current Prisma schema includes:
 - UtilityServices (Water, Electricity, etc.)
 - HouseholdMeters & MainMeters
 - MeterReadings (household & main)
-- BillingPeriods (quarterly & monthly)
+- BillingPeriods (tertiary periods)
 
 ### API Documentation
 

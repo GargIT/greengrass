@@ -6,8 +6,8 @@ A modern web application for managing utility billing for Swedish samfällighets
 
 This system replaces an Excel-based utility billing system with a comprehensive web application that supports:
 
-- **Dynamic household management** - 14 households with equal shares, simplified ownership model without andelstal calculations
-- **Quarterly billing system** - streamlined to focus on 4-month billing periods only
+- **Dynamic household management** - Any number of households with equal shares by default (andelstal removed)
+- **Tertiary billing system** - streamlined to focus on 3 billing periods per year (every 4 months)
 - **Volume-based utility billing** - all costs calculated based on consumption (m³)
 - **Multiple utility services** - water, electricity, heating, internet, membership fees
 - **Reconciliation system** - main meters vs household meters with adjustments as separate line items
@@ -43,7 +43,7 @@ This system replaces an Excel-based utility billing system with a comprehensive 
 greengrass/
 ├── backend/                 # Node.js/Express API server
 │   ├── prisma/
-│   │   ├── schema.prisma   # Database schema (quarterly billing only)
+│   │   ├── schema.prisma   # Database schema (tertiary periods only)
 │   │   └── seed.ts         # Initial data seeding
 │   ├── scripts/            # Utility scripts
 │   │   ├── import-excel-complete.ts  # Excel data import
@@ -162,16 +162,16 @@ npm run dev
 
 ### Current Implementation
 
-- ✅ **Database Schema**: Complete PostgreSQL schema focused on quarterly billing
+- ✅ **Database Schema**: Complete PostgreSQL schema focused on tertiary periods (3x/year)
 - ✅ **Authentication System**: JWT-based auth with ADMIN/MEMBER roles
 - ✅ **API Routes**: Full CRUD operations for all major entities
 - ✅ **Frontend Application**: Complete React/TypeScript app with Material-UI
 - ✅ **Role-based Access**: Different interfaces for admins vs members
-- ✅ **Household Management**: 14 households with equal shares (1/14 each)
+- ✅ **Household Management**: Dynamic household count (equal shares by default)
 - ✅ **Utility Services**: Water, electricity, membership fees, etc.
 - ✅ **Meter Management**: Both main meters and household meters
 - ✅ **Meter Readings**: Role-based reading management with consumption calculations
-- ✅ **Quarterly Billing**: Complete bill generation with volume-based calculations
+- ✅ **Invoice Generation**: Complete invoices with volume-based calculations
 - ✅ **Reconciliation System**: Main vs household meter reconciliation as separate line items
 - ✅ **PDF Invoice Generation**: Professional invoices with detailed cost breakdowns
 - ✅ **Payment Tracking**: Mark bills as paid with audit trail
@@ -217,11 +217,11 @@ npm run dev
 
 - `GET /api/billing/periods` - List billing periods
 - `POST /api/billing/periods` - Create billing period
-- `GET /api/billing/quarterly` - List quarterly bills with filters
+- `GET /api/billing/quarterly` - List quarterly bills with filters (legacy alias; use tertiary periods/invoices endpoints)
 - `POST /api/billing/generate` - Generate bills for period
-- `GET /api/billing/quarterly/:id` - Get specific bill details
-- `GET /api/billing/quarterly/:id/pdf` - Download bill as PDF
-- `PATCH /api/billing/quarterly/:id/mark-paid` - Mark bill as paid
+- `GET /api/billing/quarterly/:id` - Get specific bill details (legacy alias; use invoices endpoint)
+- `GET /api/billing/quarterly/:id/pdf` - Download bill as PDF (legacy alias; use invoices PDF endpoint)
+- `PATCH /api/billing/quarterly/:id/mark-paid` - Mark bill as paid (legacy alias; use invoices mark-paid)
 - `POST /api/billing/generate-pdfs` - Bulk generate PDF files
 - `GET /api/billing/check-readiness/:periodId` - Check if period is ready for billing
 
@@ -231,25 +231,26 @@ npm run dev
 - `GET /api/reports/consumption/:serviceId` - Consumption report
 - `GET /api/reports/billing/:periodId` - Billing period report
 - `GET /api/reports/payments` - Payments report
+- `GET /api/reports/analytics/household-comparison` - Yearly household comparison
+- `GET /api/reports/analytics/consumption-trends` - Consumption trends per period
+- `GET /api/reports/analytics/cost-analysis` - Cost analysis and breakdown
 
 ## Database Schema
 
 The system uses a comprehensive PostgreSQL schema with the following main entities:
 
-- **Households**: Information about each household (14 total with equal 1/14 shares)
+- **Households**: Information about each household (dynamic, equal shares by default)
 - **Users**: Authentication and role management (ADMIN/MEMBER)
 - **UtilityServices**: Water, electricity, membership fees, etc.
 - **MainMeters**: Meters for the entire facility
 - **HouseholdMeters**: Individual household meters
-- **BillingPeriods**: Quarterly billing periods (4-month cycles)
+- **BillingPeriods**: Tertiary billing periods (3x/year, every 4 months)
 - **MeterReadings**: Actual consumption readings (household and main)
 - **UtilityPricing**: Historical pricing for each service
 - **UtilityBilling**: Detailed billing calculations per household per service
 - **UtilityReconciliation**: Reconciliation between main and household meters
-- **QuarterlyBills**: Complete quarterly bills with all costs
+- **Invoices**: Complete invoices with all costs
 - **Payments**: Payment tracking and audit trail
-
-**Note**: Monthly billing has been removed for simplicity - the system now focuses exclusively on quarterly billing periods.
 
 ## Development
 

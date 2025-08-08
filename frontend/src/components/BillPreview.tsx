@@ -334,7 +334,7 @@ const BillPreview: React.FC<BillPreviewProps> = ({ open, onClose, billId }) => {
                       consumption = "1 st";
                       pricePerUnit = `${formatCurrency(
                         billing.fixedCost
-                      )}/kvartal`;
+                      )}/tertiärperiod`;
                       variableCost = "-";
                       fixedCost = formatCurrency(billing.fixedCost);
                     } else if (Number(billing.consumptionCost) !== 0) {

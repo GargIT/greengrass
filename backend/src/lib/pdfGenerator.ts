@@ -623,7 +623,7 @@ export class PDFGenerator {
         // Water - Fixed cost
         expandedRows.push({
           serviceName: `${utility.serviceName} - Fast avgift`,
-          description: "Kvartalsavgift för vattenförsörjning",
+          description: "Tertiär avgift för vattenförsörjning",
           quantity: 1,
           unit: "st",
           pricePerUnit: utility.fixedFee,
@@ -640,7 +640,7 @@ export class PDFGenerator {
           serviceName: utility.serviceName,
           description:
             utility.serviceType === "MEMBERSHIP"
-              ? "Kvartalsmässig medlemsavgift för samfällighetsföreningen"
+              ? "Tertiär medlemsavgift för samfällighetsföreningen"
               : "",
           quantity:
             utility.serviceType === "MEMBERSHIP" ? 1 : utility.consumption,

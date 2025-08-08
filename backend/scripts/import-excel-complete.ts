@@ -206,8 +206,8 @@ async function importExcelDataComplete() {
     const membershipService = await prisma.utilityService.create({
       data: {
         name: "Medlemsavgift",
-        description: "Kvartalsmässig medlemsavgift för samfällighetsföreningen",
-        unit: "kr/kvartal",
+        description: "Tertiär medlemsavgift för samfällighetsföreningen",
+        unit: "kr/tertiärperiod",
         serviceType: "MEMBERSHIP",
         isActive: true,
         isMandatory: true,

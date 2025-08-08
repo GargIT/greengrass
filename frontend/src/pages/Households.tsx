@@ -43,7 +43,6 @@ interface Household {
   createdAt: string;
   _count?: {
     invoices: number;
-    monthlyBills: number;
   };
 }
 
@@ -53,7 +52,6 @@ interface HouseholdFormData {
   email?: string;
   phone?: string;
   address?: string;
-  andelstal?: number;
   annualMemberFee?: number;
 }
 
@@ -75,7 +73,6 @@ const Households: React.FC = () => {
     email: "",
     phone: "",
     address: "",
-    andelstal: 1 / 14,
     annualMemberFee: 3000,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -232,7 +229,6 @@ const Households: React.FC = () => {
       email: "",
       phone: "",
       address: "",
-      andelstal: 1 / 14,
       annualMemberFee: 3000,
     });
     setFormErrors({});
@@ -494,18 +490,6 @@ const Households: React.FC = () => {
             </FormControl>
 
             <Box sx={{ display: "flex", gap: 2 }}>
-              <FormControl fullWidth error={!!formErrors.andelstal}>
-                <InputLabel>Andelstal</InputLabel>
-                <OutlinedInput
-                  type="number"
-                  label="Andelstal"
-                  value={formData.andelstal}
-                  onChange={(e) =>
-                    handleInputChange("andelstal", parseFloat(e.target.value))
-                  }
-                  inputProps={{ step: 0.01, min: 0, max: 1 }}
-                />
-              </FormControl>
               <FormControl fullWidth error={!!formErrors.annualMemberFee}>
                 <InputLabel>Årsavgift (kr)</InputLabel>
                 <OutlinedInput
@@ -618,18 +602,10 @@ const Households: React.FC = () => {
                 <Box sx={{ display: "flex", gap: 2 }}>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Kvartalsfakturor
+                      Fakturor
                     </Typography>
                     <Typography>
                       {selectedHousehold._count.invoices} st
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Månadsfakturor
-                    </Typography>
-                    <Typography>
-                      {selectedHousehold._count.monthlyBills} st
                     </Typography>
                   </Box>
                 </Box>

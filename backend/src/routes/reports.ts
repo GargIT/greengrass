@@ -214,7 +214,7 @@ router.get("/billing/:periodId", async (req, res, next) => {
             householdNumber: true,
             ownerName: true,
             email: true,
-            // andelstal field removed - using equal shares (1/14) for all
+            // andelstal field removed - equal shares computed dynamically (1/N)
           },
         },
         payments: true,
