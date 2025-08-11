@@ -14,6 +14,18 @@ import {
   Alert,
   Tooltip,
   CircularProgress,
+  Select,
+  MenuItem,
+  TextField,
+  Divider,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
 } from "@mui/material";
 import {
   DataGrid,
@@ -30,6 +42,8 @@ import {
   Phone as PhoneIcon,
   Home as HomeIcon,
   Person as PersonIcon,
+  Link as LinkIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 
 interface Household {
@@ -55,6 +69,34 @@ interface HouseholdFormData {
   annualMemberFee?: number;
 }
 
+interface UtilityService {
+  id: string;
+  name: string;
+  unit: string;
+  serviceType: string;
+  isActive: boolean;
+}
+
+interface HouseholdMeter {
+  id: string;
+  householdId: string;
+  serviceId: string;
+  meterSerial?: string;
+  installationDate?: string;
+  isActive: boolean;
+  createdAt: string;
+  service: UtilityService;
+  _count: {
+    readings: number;
+  };
+}
+
+interface ConnectionFormData {
+  serviceId: string;
+  meterSerial?: string;
+  installationDate?: string;
+}
+
 const Households: React.FC = () => {
   const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +119,21 @@ const Households: React.FC = () => {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Service connection states
+  const [connections, setConnections] = useState<HouseholdMeter[]>([]);
+  const [services, setServices] = useState<UtilityService[]>([]);
+  const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
+  const [connectionFormData, setConnectionFormData] =
+    useState<ConnectionFormData>({
+      serviceId: "",
+      meterSerial: "",
+      installationDate: "",
+    });
+  const [connectionFormErrors, setConnectionFormErrors] = useState<
+    Record<string, string>
+  >({});
+  const [connectionSubmitting, setConnectionSubmitting] = useState(false);
 
   // DataGrid column definitions
   const columns: GridColDef[] = [
@@ -221,6 +278,46 @@ const Households: React.FC = () => {
     }
   };
 
+  const fetchConnections = async (householdId: string) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(
+        `/api/household-meters?householdId=${householdId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setConnections(data.data);
+      } else {
+        console.error("Failed to fetch connections");
+      }
+    } catch {
+      console.error("Failed to fetch connections");
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/utility-services", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setServices(data.data.filter((s: UtilityService) => s.isActive));
+      }
+    } catch {
+      console.error("Failed to fetch services");
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       householdNumber:
@@ -255,6 +352,8 @@ const Households: React.FC = () => {
   const handleViewClick = (household: Household) => {
     setSelectedHousehold(household);
     setIsViewDialogOpen(true);
+    fetchConnections(household.id);
+    fetchServices();
   };
 
   const handleFormSubmit = async (isEdit: boolean) => {
@@ -297,6 +396,104 @@ const Households: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Connection handlers
+  const handleAddConnection = () => {
+    setConnectionFormData({
+      serviceId: "",
+      meterSerial: "",
+      installationDate: "",
+    });
+    setConnectionFormErrors({});
+    setIsConnectionDialogOpen(true);
+  };
+
+  const handleConnectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHousehold) return;
+
+    setConnectionSubmitting(true);
+    setConnectionFormErrors({});
+
+    try {
+      const submitData = {
+        householdId: selectedHousehold.id,
+        serviceId: connectionFormData.serviceId,
+        meterSerial: connectionFormData.meterSerial || undefined,
+        installationDate: connectionFormData.installationDate || undefined,
+      };
+
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/household-meters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(submitData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setConnections((prev) => [...prev, data.data]);
+        setIsConnectionDialogOpen(false);
+      } else {
+        if (data.details) {
+          const errors: Record<string, string> = {};
+          data.details.forEach(
+            (detail: { path?: string[]; message: string }) => {
+              if (detail.path) {
+                errors[detail.path[0]] = detail.message;
+              }
+            }
+          );
+          setConnectionFormErrors(errors);
+        } else {
+          setError(data.error || "Failed to save connection");
+        }
+      }
+    } catch {
+      setError("Failed to save connection");
+    } finally {
+      setConnectionSubmitting(false);
+    }
+  };
+
+  const handleDeleteConnection = async (connectionId: string) => {
+    if (!confirm("Är du säker på att du vill ta bort denna anslutning?")) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/household-meters/${connectionId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setConnections((prev) =>
+          prev.filter((conn) => conn.id !== connectionId)
+        );
+      } else {
+        setError(data.error || "Failed to delete connection");
+      }
+    } catch {
+      setError("Failed to delete connection");
+    }
+  };
+
+  const getAvailableServices = () => {
+    const connectedServiceIds = connections.map((conn) => conn.serviceId);
+    return services.filter(
+      (service) => !connectedServiceIds.includes(service.id)
+    );
   };
 
   const handleInputChange = (
@@ -610,6 +807,101 @@ const Households: React.FC = () => {
                   </Box>
                 </Box>
               )}
+
+              {/* Service Connections Section */}
+              <Divider sx={{ my: 2 }} />
+              <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="h6">Tjänstanslutningar</Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<LinkIcon />}
+                    onClick={handleAddConnection}
+                    disabled={getAvailableServices().length === 0}
+                  >
+                    Lägg till
+                  </Button>
+                </Box>
+
+                {connections.length === 0 ? (
+                  <Typography
+                    color="text.secondary"
+                    sx={{ textAlign: "center", py: 2 }}
+                  >
+                    Inga tjänstanslutningar
+                  </Typography>
+                ) : (
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Tjänst</TableCell>
+                          <TableCell>Typ</TableCell>
+                          <TableCell>Mätarnummer</TableCell>
+                          <TableCell>Installation</TableCell>
+                          <TableCell>Avläsningar</TableCell>
+                          <TableCell align="right">Åtgärder</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {connections.map((connection) => (
+                          <TableRow key={connection.id}>
+                            <TableCell>{connection.service.name}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={connection.service.serviceType}
+                                size="small"
+                                variant="outlined"
+                                color={
+                                  connection.service.serviceType === "WATER"
+                                    ? "primary"
+                                    : connection.service.serviceType ===
+                                      "ELECTRICITY"
+                                    ? "warning"
+                                    : connection.service.serviceType ===
+                                      "HEATING"
+                                    ? "error"
+                                    : "default"
+                                }
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {connection.meterSerial || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {connection.installationDate
+                                ? new Date(
+                                    connection.installationDate
+                                  ).toLocaleDateString("sv-SE")
+                                : "-"}
+                            </TableCell>
+                            <TableCell>{connection._count.readings}</TableCell>
+                            <TableCell align="right">
+                              <IconButton
+                                size="small"
+                                onClick={() =>
+                                  handleDeleteConnection(connection.id)
+                                }
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
             </Box>
           )}
         </DialogContent>
@@ -635,6 +927,108 @@ const Households: React.FC = () => {
             Redigera
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Add Connection Dialog */}
+      <Dialog
+        open={isConnectionDialogOpen}
+        onClose={() => setIsConnectionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <LinkIcon />
+            Lägg till tjänstanslutning
+          </Box>
+        </DialogTitle>
+        <form onSubmit={handleConnectionSubmit}>
+          <DialogContent>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {selectedHousehold && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Lägger till anslutning för Hushåll #
+                  {selectedHousehold.householdNumber} -{" "}
+                  {selectedHousehold.ownerName}
+                </Alert>
+              )}
+
+              <FormControl fullWidth error={!!connectionFormErrors.serviceId}>
+                <InputLabel>Tjänst</InputLabel>
+                <Select
+                  value={connectionFormData.serviceId}
+                  onChange={(e) =>
+                    setConnectionFormData({
+                      ...connectionFormData,
+                      serviceId: e.target.value,
+                    })
+                  }
+                  label="Tjänst"
+                  required
+                >
+                  {getAvailableServices().map((service) => (
+                    <MenuItem key={service.id} value={service.id}>
+                      {service.name} ({service.serviceType})
+                    </MenuItem>
+                  ))}
+                </Select>
+                {connectionFormErrors.serviceId && (
+                  <Typography color="error" variant="caption">
+                    {connectionFormErrors.serviceId}
+                  </Typography>
+                )}
+              </FormControl>
+
+              <TextField
+                label="Mätarnummer"
+                value={connectionFormData.meterSerial}
+                onChange={(e) =>
+                  setConnectionFormData({
+                    ...connectionFormData,
+                    meterSerial: e.target.value,
+                  })
+                }
+                error={!!connectionFormErrors.meterSerial}
+                helperText={connectionFormErrors.meterSerial}
+                fullWidth
+              />
+
+              <TextField
+                label="Installationsdatum"
+                type="date"
+                value={connectionFormData.installationDate}
+                onChange={(e) =>
+                  setConnectionFormData({
+                    ...connectionFormData,
+                    installationDate: e.target.value,
+                  })
+                }
+                error={!!connectionFormErrors.installationDate}
+                helperText={connectionFormErrors.installationDate}
+                fullWidth
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIsConnectionDialogOpen(false)}>
+              Avbryt
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={connectionSubmitting || !connectionFormData.serviceId}
+            >
+              {connectionSubmitting ? (
+                <CircularProgress size={20} />
+              ) : (
+                "Lägg till"
+              )}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Box>
   );

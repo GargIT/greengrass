@@ -26,7 +26,6 @@ import {
   Dashboard as DashboardIcon,
   Home as HouseholdIcon,
   Water as UtilityIcon,
-  Link as ConnectionIcon,
   Speed as MeterIcon,
   Receipt as BillingIcon,
   Assessment as ReportsIcon,
@@ -69,12 +68,6 @@ const menuItems = [
     text: "Tjänster",
     icon: <UtilityIcon />,
     path: "/utility-services",
-    roles: ["ADMIN"],
-  },
-  {
-    text: "Anslutningar",
-    icon: <ConnectionIcon />,
-    path: "/household-service-connections",
     roles: ["ADMIN"],
   },
   {

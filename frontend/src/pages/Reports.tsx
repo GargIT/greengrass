@@ -13,6 +13,8 @@ import {
   Alert,
   Tabs,
   Tab,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import ConsumptionTrends from "../components/charts/ConsumptionTrends";
@@ -100,11 +102,17 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+// Allow the year dropdown to select a specific year or "all years"
+type YearOption = number | "all";
+
 const Reports: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  // Dropdown year option: can be a specific year or "all"
+  const [yearOption, setYearOption] = useState<YearOption>("all");
   const [selectedService, setSelectedService] = useState<string>("");
   const [selectedHousehold, setSelectedHousehold] = useState<string>("");
+  const [showAllYearsTrends, setShowAllYearsTrends] = useState<boolean>(true);
 
   // Data states
   const [loading, setLoading] = useState(false);
@@ -182,14 +190,13 @@ const Reports: React.FC = () => {
 
   const fetchConsumptionTrends = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        year: selectedYear.toString(),
-        ...(selectedService && { serviceId: selectedService }),
-        ...(selectedHousehold && { householdId: selectedHousehold }),
-      });
+      const params = new URLSearchParams();
+      if (!showAllYearsTrends) params.set("year", selectedYear.toString());
+      if (selectedService) params.set("serviceId", selectedService);
+      if (selectedHousehold) params.set("householdId", selectedHousehold);
 
       const response = await fetch(
-        `/api/reports/analytics/consumption-trends?${params}`,
+        `/api/reports/analytics/consumption-trends?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
@@ -203,7 +210,7 @@ const Reports: React.FC = () => {
     } catch {
       console.error("Error fetching consumption trends");
     }
-  }, [selectedYear, selectedService, selectedHousehold]);
+  }, [selectedYear, selectedService, selectedHousehold, showAllYearsTrends]);
 
   const fetchCostAnalysis = useCallback(async () => {
     try {
@@ -295,6 +302,28 @@ const Reports: React.FC = () => {
     }).format(value);
   };
 
+  // Keep the dropdown and toggle in sync for user clarity
+  const handleYearOptionChange = (value: YearOption) => {
+    setYearOption(value);
+    if (value === "all") {
+      setShowAllYearsTrends(true);
+    } else {
+      setSelectedYear(value);
+      setShowAllYearsTrends(false);
+    }
+  };
+
+  const handleToggleAllYears = (checked: boolean) => {
+    setShowAllYearsTrends(checked);
+    if (checked) {
+      // If turning on "all years", reflect in dropdown
+      setYearOption("all");
+    } else if (yearOption === "all") {
+      // If turning off while dropdown shows "all", switch dropdown to the current numeric year
+      setYearOption(selectedYear);
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -342,10 +371,13 @@ const Reports: React.FC = () => {
               <FormControl fullWidth>
                 <InputLabel>År</InputLabel>
                 <Select
-                  value={selectedYear}
+                  value={yearOption}
                   label="År"
-                  onChange={(e) => setSelectedYear(e.target.value as number)}
+                  onChange={(e) =>
+                    handleYearOptionChange(e.target.value as YearOption)
+                  }
                 >
+                  <MenuItem value="all">Alla år</MenuItem>
                   {years.map((year) => (
                     <MenuItem key={year} value={year}>
                       {year}
@@ -421,7 +453,7 @@ const Reports: React.FC = () => {
             >
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h4" color="primary">
-                  {dashboardData.overview.totalHouseholds}
+                  {dashboardData?.overview.totalHouseholds ?? 0}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Aktiva hushåll
@@ -429,7 +461,7 @@ const Reports: React.FC = () => {
               </Box>
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h4" color="warning.main">
-                  {dashboardData.overview.pendingBills}
+                  {dashboardData?.overview.pendingBills ?? 0}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Väntande fakturor
@@ -437,7 +469,7 @@ const Reports: React.FC = () => {
               </Box>
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h4" color="success.main">
-                  {formatCurrency(dashboardData.overview.totalRevenue)}
+                  {formatCurrency(dashboardData?.overview.totalRevenue ?? 0)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Total intäkt ({selectedYear})
@@ -445,7 +477,7 @@ const Reports: React.FC = () => {
               </Box>
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h4" color="info.main">
-                  {dashboardData.overview.activeServices}
+                  {dashboardData?.overview.activeServices ?? 0}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Aktiva tjänster
@@ -471,9 +503,25 @@ const Reports: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           <Box>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showAllYearsTrends}
+                    onChange={(e) => handleToggleAllYears(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Visa alla år"
+              />
+            </Box>
             <ConsumptionTrends
               data={consumptionTrends}
-              title={`Förbrukningstrender ${selectedYear}`}
+              title={
+                showAllYearsTrends
+                  ? "Förbrukningstrender – alla år"
+                  : `Förbrukningstrender ${selectedYear}`
+              }
             />
           </Box>
         </TabPanel>

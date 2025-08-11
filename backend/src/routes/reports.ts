@@ -359,21 +359,22 @@ router.get("/export/:type", async (req, res, next) => {
 router.get("/analytics/consumption-trends", async (req, res, next) => {
   try {
     const { serviceId, year, householdId } = req.query;
-    const currentYear = year
-      ? parseInt(year as string)
-      : new Date().getFullYear();
+    // When year is omitted, return trends across ALL years
+    const yearFilter = year ? String(year) : undefined;
 
-    // Get all billing periods for the year - filter by period name
+    // Get billing periods (optionally scoped to a specific year)
     const billingPeriods = await prisma.billingPeriod.findMany({
-      where: {
-        periodName: {
-          contains: currentYear.toString(),
-        },
-      },
+      where: yearFilter
+        ? {
+            periodName: {
+              contains: yearFilter,
+            },
+          }
+        : undefined,
       orderBy: { startDate: "asc" },
     });
 
-    const trendsData = [];
+    const trendsData: any[] = [];
 
     for (const period of billingPeriods) {
       // Get readings for this period
@@ -427,7 +428,7 @@ router.get("/analytics/consumption-trends", async (req, res, next) => {
       success: true,
       data: {
         trends: trendsData,
-        year: currentYear,
+        year: yearFilter ? parseInt(yearFilter) : null,
         filters: { serviceId, householdId },
       },
     });

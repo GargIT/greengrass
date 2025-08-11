@@ -15,7 +15,6 @@ import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import Households from "./pages/Households";
 import UtilityServices from "./pages/UtilityServices";
-import HouseholdServiceConnections from "./pages/HouseholdServiceConnections";
 import MeterReadings from "./pages/MeterReadings";
 import Billing from "./pages/Billing";
 import Reports from "./pages/Reports";
@@ -134,16 +133,6 @@ function App() {
                 <Layout onLogout={handleLogout} fullWidth>
                   <ProtectedRoute requiredRole="ADMIN">
                     <UtilityServices />
-                  </ProtectedRoute>
-                </Layout>
-              }
-            />
-            <Route
-              path="/household-service-connections"
-              element={
-                <Layout onLogout={handleLogout} fullWidth>
-                  <ProtectedRoute requiredRole="ADMIN">
-                    <HouseholdServiceConnections />
                   </ProtectedRoute>
                 </Layout>
               }
