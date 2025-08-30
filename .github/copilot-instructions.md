@@ -195,7 +195,7 @@ import { prisma } from "../lib/prisma";
 - ✅ Historical data import from Excel completed
 - ✅ PDF invoice generation with polished output
 - ✅ Mark bills as paid functionality
-- 🔲 Email notifications system
+- ✅ Email notifications system (komplett implementerat August 30, 2025)
 - 🔲 Advanced reporting dashboard
 
 ## Key Files for Understanding
@@ -204,4 +204,11 @@ import { prisma } from "../lib/prisma";
 - `backend/prisma/schema.prisma` - Complete database schema
 - `backend/src/routes/auth.ts` - Authentication patterns
 - `backend/src/routes/meterReadings.ts` - Role-based data filtering example
+- `backend/src/routes/notifications.ts` - Email notification API endpoints
+- `backend/src/lib/emailService.ts` - Email service with queue and templates
+- `backend/src/lib/notificationService.ts` - Business logic for notifications
+- `backend/src/lib/schedulerService.ts` - Automated email scheduling
 - `frontend/src/pages/MeterReadings.tsx` - Role-based UI patterns
+- `frontend/src/pages/SystemAdmin.tsx` - Email testing GUI interface
+- `test-email.sh` - CLI script for email system testing
+- `SYSTEM_ADMIN_GUIDE.md` - Complete guide for email administration
