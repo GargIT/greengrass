@@ -1002,8 +1002,14 @@ async function importExcelDataComplete() {
           const dueDate = new Date(period.readingDeadline);
           dueDate.setMonth(dueDate.getMonth() + 4);
 
+          // Generate invoice number
+          const invoiceNumber = `INV-${
+            period.periodName
+          }-${household.householdNumber.toString().padStart(3, "0")}`;
+
           await prisma.invoice.create({
             data: {
+              invoiceNumber,
               householdId: household.id,
               billingPeriodId: period.id,
               totalUtilityCosts,

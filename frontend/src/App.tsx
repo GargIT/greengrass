@@ -18,6 +18,7 @@ import UtilityServices from "./pages/UtilityServices";
 import MeterReadings from "./pages/MeterReadings";
 import Billing from "./pages/Billing";
 import Reports from "./pages/Reports";
+import SystemAdmin from "./pages/SystemAdmin";
 import Login from "./pages/Login";
 
 function App() {
@@ -159,6 +160,16 @@ function App() {
                 <Layout onLogout={handleLogout} fullWidth>
                   <ProtectedRoute allowedRoles={["ADMIN", "MEMBER"]}>
                     <Reports />
+                  </ProtectedRoute>
+                </Layout>
+              }
+            />
+            <Route
+              path="/system-admin"
+              element={
+                <Layout onLogout={handleLogout} fullWidth>
+                  <ProtectedRoute requiredRole="ADMIN">
+                    <SystemAdmin />
                   </ProtectedRoute>
                 </Layout>
               }

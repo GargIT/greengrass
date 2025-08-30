@@ -2,6 +2,7 @@ import { Router, Request } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { PDFGenerator } from "../lib/pdfGenerator";
+import { notificationService } from "../lib/notificationService";
 
 const router = Router();
 
@@ -657,8 +658,14 @@ router.post("/generate", async (req, res, next) => {
       }
       const totalAmount = totalUtilityCosts + totalSharedCosts + memberFee;
 
+      // Generate invoice number
+      const invoiceNumber = `INV-${
+        billingPeriod.periodName
+      }-${household.householdNumber.toString().padStart(3, "0")}`;
+
       const bill = await prisma.invoice.create({
         data: {
+          invoiceNumber,
           householdId: household.id,
           billingPeriodId,
           memberFee,
@@ -682,6 +689,23 @@ router.post("/generate", async (req, res, next) => {
       data: bills,
       message: `Generated ${bills.length} invoices`,
     });
+
+    // Send new invoice notifications after successful response
+    // This is done asynchronously to not delay the API response
+    if (bills.length > 0) {
+      setImmediate(async () => {
+        try {
+          await notificationService.sendNewInvoiceNotifications(
+            billingPeriodId
+          );
+          console.log(
+            `📧 New invoice notifications sent for ${bills.length} invoices`
+          );
+        } catch (error) {
+          console.error("Failed to send new invoice notifications:", error);
+        }
+      });
+    }
   } catch (error) {
     next(error);
     return;

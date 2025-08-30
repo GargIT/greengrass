@@ -34,6 +34,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   People as PeopleIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 
 const drawerWidth = 240;
@@ -87,6 +88,12 @@ const menuItems = [
     icon: <ReportsIcon />,
     path: "/reports",
     roles: ["ADMIN", "MEMBER"],
+  },
+  {
+    text: "Systemadmin",
+    icon: <SettingsIcon />,
+    path: "/system-admin",
+    roles: ["ADMIN"],
   },
 ];
 

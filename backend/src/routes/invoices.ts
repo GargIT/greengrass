@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { PDFGenerator } from "../lib/pdfGenerator";
+import { notificationService } from "../lib/notificationService";
 
 const router = Router();
 
@@ -255,11 +256,26 @@ router.post("/:id/payments", async (req, res, next) => {
     const totalPaid = Number(totalPayments._sum.amount || 0);
     const invoiceAmount = Number(invoice.totalAmount);
 
-    if (totalPaid >= invoiceAmount) {
+    let wasJustPaid = false;
+    if (totalPaid >= invoiceAmount && invoice.status !== "paid") {
       await prisma.invoice.update({
         where: { id },
-        data: { status: "paid" },
+        data: {
+          status: "paid",
+          paidDate: new Date(),
+        },
       });
+      wasJustPaid = true;
+    }
+
+    // Send payment confirmation email if invoice was just fully paid
+    if (wasJustPaid) {
+      try {
+        await notificationService.sendPaymentConfirmation(id);
+      } catch (error) {
+        console.error("Failed to send payment confirmation email:", error);
+        // Don't fail the payment operation if email fails
+      }
     }
 
     res.json({
@@ -292,9 +308,19 @@ router.put("/:id/status", async (req, res, next) => {
     const { id } = req.params;
     const { status } = updateStatusSchema.parse(req.body);
 
+    const currentInvoice = await prisma.invoice.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
     const invoice = await prisma.invoice.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === "paid" && currentInvoice?.status !== "paid"
+          ? { paidDate: new Date() }
+          : {}),
+      },
       include: {
         household: {
           select: {
@@ -309,6 +335,16 @@ router.put("/:id/status", async (req, res, next) => {
         },
       },
     });
+
+    // Send payment confirmation email if status changed to paid
+    if (status === "paid" && currentInvoice?.status !== "paid") {
+      try {
+        await notificationService.sendPaymentConfirmation(id);
+      } catch (error) {
+        console.error("Failed to send payment confirmation email:", error);
+        // Don't fail the status update if email fails
+      }
+    }
 
     res.json({
       success: true,

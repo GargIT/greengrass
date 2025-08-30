@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
+import { notificationService } from "../lib/notificationService";
 
 const router = Router();
 
@@ -94,6 +95,14 @@ router.post("/", async (req, res, next) => {
     const household = await prisma.household.create({
       data: validatedData,
     });
+
+    // Create default notification settings for new household
+    try {
+      await notificationService.createDefaultNotificationSettings(household.id);
+    } catch (error) {
+      console.error("Failed to create default notification settings:", error);
+      // Don't fail the household creation if notification settings fail
+    }
 
     // Update ownership ratios for all households after creating a new one
     await updateOwnershipRatios();

@@ -21,11 +21,14 @@ import invoicesRoutes from "./routes/invoices";
 import reportsRoutes from "./routes/reports";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
+import notificationsRoutes from "./routes/notifications";
 
 // Import middleware
 import { errorHandler } from "./middleware/errorHandler";
 import { notFound } from "./middleware/notFound";
 import { authenticate } from "./middleware/auth";
+import { initializeEmailTemplates } from "./lib/emailTemplates";
+import { schedulerService } from "./lib/schedulerService";
 
 // Import PDF service for cleanup
 import { PDFGenerator } from "./lib/pdfGenerator";
@@ -84,13 +87,14 @@ app.use("/api/billing", authenticate, billingRoutes);
 app.use("/api/billing", authenticate, billingAutomationRoutes);
 app.use("/api/invoices", authenticate, invoicesRoutes);
 app.use("/api/reports", authenticate, reportsRoutes);
+app.use("/api/notifications", authenticate, notificationsRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 Gröngräset Backend Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
@@ -100,6 +104,21 @@ const server = app.listen(PORT, () => {
   console.log(`   • http://localhost:${PORT}/api-docs`);
   console.log(`   • http://192.168.11.7:${PORT}/api-docs`);
   console.log(`📄 PDF invoice generation enabled`);
+
+  // Initialize email templates
+  try {
+    await initializeEmailTemplates();
+    console.log(`📧 Email notifications system initialized`);
+  } catch (error) {
+    console.error(`❌ Failed to initialize email templates:`, error);
+  }
+
+  // Initialize scheduler for automated notifications
+  try {
+    schedulerService.init();
+  } catch (error) {
+    console.error(`❌ Failed to initialize scheduler:`, error);
+  }
 });
 
 // Graceful shutdown
