@@ -1,0 +1,46 @@
+# Node
+node_modules/
+
+# Builds
+/dist/
+/build/
+/.turbo/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env files
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Prisma
+backend/prisma/*.db
+
+# Local data and cache
+*.local
+*.cache
+.sass-cache
+.next/
+
+# Lockfiles (optional, keep if repo manages them centrally)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
