@@ -26,7 +26,7 @@
 
 ---
 
-## Project Status (August 7, 2025)
+## Project Status (August 31, 2025)
 
 ### ✅ COMPLETED FEATURES
 
@@ -35,6 +35,7 @@
 - ✅ **PostgreSQL Database**: Full schema implemented with Prisma ORM
 - ✅ **Node.js/Express API**: RESTful endpoints with TypeScript
 - ✅ **Authentication System**: JWT-based auth with role management (ADMIN/MEMBER)
+- ✅ **Email Notification System**: SMTP integration with automated notifications
 - ✅ **User Management**: Full CRUD operations for users and household linking
 - ✅ **Data Validation**: Zod schema validation throughout
 - ✅ **Security**: Helmet, CORS, rate limiting, password hashing
@@ -360,9 +361,9 @@ interface UtilityService {
 
 interface Member {
   id: string;
-  householdNumber: string; // 1-14
+  householdNumber: string; // dynamic numbering
   ownerName: string;
-  andelstal: number; // 1/14 = 0.0714285714 for equal shares
+  andelstal: number; // 1/n = equal shares (e.g., 1/16 = 0.0625 for 16 households)
   annualMemberFee: number; // 3000 SEK
   paymentStatus: "paid" | "pending" | "overdue";
   balanceAccount: number;
@@ -374,11 +375,11 @@ interface Member {
 ```typescript
 interface BillingPeriod {
   id: string;
-  periodName: string; // e.g., "2025-Q1", "2025-01", "2025-02"
-  periodType: "quarterly" | "monthly";
+  periodName: string; // e.g., "2025-T1", "2025-T2", "2025-T3"
+  periodType: "tertiary";
   startDate: Date;
   endDate: Date;
-  isOfficialBilling: boolean; // true only for 3 main quarterly periods
+  isOfficialBilling: boolean; // true for all 3 tertiary periods
   isBillingEnabled: boolean; // true if bills should be generated for this period
   isReconciliationEnabled: boolean; // true if reconciliation should be performed
   readingDeadline: Date; // when meter readings are due
@@ -401,19 +402,19 @@ interface UtilityBilling {
   // Billing breakdown
   costPerUnit: number; // SEK per unit (m³, kWh, etc.)
   consumptionCost: number; // adjusted consumption × cost per unit
-  fixedFeeShare: number; // fixed fee ÷ 14 households
+  fixedFeeShare: number; // fixed fee ÷ active households
   totalUtilityCost: number; // consumption cost + fixed fee share
 
   created_at: Date;
 }
 
-interface QuarterlyBill {
+interface TertiaryBill {
   id: string;
   householdId: string;
   billingPeriodId: string; // references a BillingPeriod with isOfficialBilling = true
-  memberFee: number; // 1000 SEK per quarterly period
+  memberFee: number; // 1000 SEK per tertiary period
   utilityCharges: UtilityBilling[]; // array of all utility services for this period
-  sharedCosts: number; // total shared costs ÷ 14 households
+  sharedCosts: number; // total shared costs ÷ active households
   totalAmount: number;
   dueDate: Date;
   status: "pending" | "paid" | "overdue";
@@ -432,7 +433,7 @@ interface MonthlyBill {
 interface MeterReading {
   id: string;
   meterId: string; // household or main meter
-  billingPeriodId: string; // can be quarterly or monthly period
+  billingPeriodId: string; // references tertiary billing period
   meterReading: number;
   readingDate: Date;
   consumption?: number; // calculated since last reading
@@ -460,8 +461,8 @@ interface Budget {
     reserves: number;
   };
   totalSharedCosts: number;
-  totalMemberFees: number; // 14 × 3000 = 42,000 SEK
-  costPerHousehold: number; // shared costs ÷ 14
+  totalMemberFees: number; // n × 3000 = total annual fees (SEK)
+  costPerHousehold: number; // shared costs ÷ active households
 }
 ```
 
@@ -473,7 +474,7 @@ interface Budget {
 2. **Properties** - Individual properties with shares and metadata
 3. **Transactions** - All financial movements
 4. **Budget Items** - Planned expenses by category
-5. **Fee Schedules** - Monthly/quarterly fee calculations
+5. **Fee Schedules** - Tertiary fee calculations
 6. **Payments** - Property owner payment records
 
 ### UI Components to Build
@@ -484,7 +485,7 @@ interface Budget {
 Dashboard
 ├── Multi-Utility Billing Overview
 ├── Household Management
-│   ├── Household List (14 households)
+│   ├── Household List (dynamic households)
 │   ├── Add/Edit Household
 │   └── Payment History
 ├── Utility Services
@@ -497,7 +498,7 @@ Dashboard
 │   ├── Reading History
 │   └── Consumption Reports
 ├── Billing & Payments
-│   ├── Generate Quarterly Bills
+│   ├── Generate Tertiary Bills
 │   ├── Payment Tracking
 │   └── Outstanding Balances
 ├── Shared Costs Management
@@ -602,13 +603,13 @@ Database (PostgreSQL)
 ### Phase 2: Core Features ✅ COMPLETED
 
 - ✅ Build user management (CRUD operations with role-based access)
-- ✅ Implement household management (14 households, removed andelstal)
+- ✅ Implement household management (dynamic households, removed andelstal)
 - ✅ Create dashboard with key metrics
 - ✅ Set up complete database schema for utility management
 - ✅ Utility services management (Water, Electricity, Gas, etc.)
 - ✅ Meter management (household + main meters)
 - ✅ Meter readings with role-based restrictions
-- ✅ Billing periods (quarterly + monthly support)
+- ✅ Billing periods (tertiary billing support)
 
 ## 🚧 REMAINING IMPLEMENTATION PHASES
 
@@ -660,10 +661,10 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Households table (14 households)
+-- Households table (dynamic households)
 CREATE TABLE households (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  household_number INTEGER UNIQUE NOT NULL CHECK (household_number BETWEEN 1 AND 14),
+  household_number INTEGER UNIQUE NOT NULL,
   owner_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE,
   phone VARCHAR(20),
@@ -737,7 +738,7 @@ CREATE TABLE utility_reconciliation (
   main_meter_total DECIMAL(12,3) NOT NULL, -- sum of all main meters for service
   household_total DECIMAL(12,3) NOT NULL, -- sum of all household meters
   difference DECIMAL(12,3) NOT NULL, -- main total - household total
-  adjustment_per_household DECIMAL(10,3) NOT NULL, -- difference ÷ 14
+  adjustment_per_household DECIMAL(10,3) NOT NULL, -- difference ÷ active households
   reconciliation_date DATE NOT NULL,
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -750,7 +751,7 @@ CREATE TABLE utility_pricing (
   effective_date DATE NOT NULL,
   price_per_unit DECIMAL(8,4) NOT NULL, -- SEK per unit (m³, kWh, etc.)
   fixed_fee_total DECIMAL(10,2) DEFAULT 0, -- total fixed fee (subscription, connection fee, etc.)
-  fixed_fee_per_household DECIMAL(8,2) DEFAULT 0, -- calculated: fixed_fee_total ÷ 14
+  fixed_fee_per_household DECIMAL(8,2) DEFAULT 0, -- calculated: fixed_fee_total ÷ active households
   is_active BOOLEAN DEFAULT true,
   notes TEXT, -- e.g., "Includes water subscription fee"
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -772,30 +773,30 @@ CREATE TABLE utility_billing (
   -- Pricing breakdown
   cost_per_unit DECIMAL(8,4) NOT NULL, -- variable rate
   consumption_cost DECIMAL(10,2) NOT NULL, -- adjusted consumption × rate
-  fixed_fee_share DECIMAL(8,2) NOT NULL, -- fixed fee ÷ 14 households
+  fixed_fee_share DECIMAL(8,2) NOT NULL, -- fixed fee ÷ active households
   total_utility_cost DECIMAL(10,2) NOT NULL, -- consumption cost + fixed fee share
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Billing periods table (supports both quarterly and monthly periods)
+-- Billing periods table (supports tertiary billing periods)
 CREATE TABLE billing_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  period_name VARCHAR(20) NOT NULL UNIQUE, -- e.g., "2025-Q1", "2025-01", "2025-02", etc.
-  period_type ENUM('quarterly', 'monthly') NOT NULL,
+  period_name VARCHAR(20) NOT NULL UNIQUE, -- e.g., "2025-T1", "2025-T2", "2025-T3"
+  period_type ENUM('tertiary') NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  is_official_billing BOOLEAN DEFAULT false, -- true only for 3 main quarterly periods
-  is_billing_enabled BOOLEAN DEFAULT false, -- true if bills should be generated for this period
-  is_reconciliation_enabled BOOLEAN DEFAULT false, -- true if reconciliation should be performed
+  is_official_billing BOOLEAN DEFAULT true, -- true for all 3 tertiary periods
+  is_billing_enabled BOOLEAN DEFAULT true, -- true for all tertiary periods
+  is_reconciliation_enabled BOOLEAN DEFAULT true, -- true for all tertiary periods
   reading_deadline DATE NOT NULL, -- when meter readings are due
-  billing_deadline DATE, -- when bills must be generated (nullable for monitoring-only periods)
+  billing_deadline DATE NOT NULL, -- when bills must be generated
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   UNIQUE(period_name, period_type)
 );
 
--- Official quarterly bills table (every 4th month)
-CREATE TABLE quarterly_bills (
+-- Official tertiary bills table (every 4th month)
+CREATE TABLE tertiary_bills (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id UUID REFERENCES households(id),
   billing_period_id UUID REFERENCES billing_periods(id),
@@ -946,7 +947,7 @@ CREATE TABLE water_pricing (
 
 **Key Details:**
 
-- **14 households** with equal shares (andelstal = 1/14 = 0.07142857)
+- **Dynamic households** with equal shares (andelstal = 1/n households)
 - **Annual member fee:** 3,000 SEK per household
 - **Payment schedule:** 3 payments per year (1,000 SEK per payment)
 - **Primary purpose:** Water consumption billing + shared cost management
@@ -974,7 +975,7 @@ For each utility service:
    - Adjusted Consumption = Household Reading
 3. Calculate service costs:
    - Consumption Cost = Adjusted Consumption × Variable Rate
-   - Fixed Fee Share = Total Fixed Fee ÷ 14 households
+   - Fixed Fee Share = Total Fixed Fee ÷ active households
    - Total Service Cost = Consumption Cost + Fixed Fee Share
 
 Total Bill = Member Fee + Sum(All Service Costs) + Shared Costs Share
@@ -983,7 +984,7 @@ Where:
 - Member Fee = 3,000 SEK ÷ 3 payments = 1,000 SEK
 - Each service calculated independently with both variable and fixed components
 - Fixed fees (subscriptions, connection fees) split equally
-- Shared Cost Share = Total Shared Costs ÷ 14 households
+- Shared Cost Share = Total Shared Costs ÷ active households
 ```
 
 **Cost Structure:**
@@ -997,7 +998,7 @@ Where:
 
 - Currently 3 times per year (can be adjusted in the web app)
 - Corresponds with water meter reading schedule
-- Quarterly billing cycle
+- Tertiary billing cycle (every 4 months)
 
 ## Next Steps
 
@@ -1042,23 +1043,16 @@ The system supports flexible reading and billing periods to accommodate both man
 
 ### Reconciliation Process
 
-#### For Official Quarterly Periods:
+#### For Official Tertiary Periods:
 
 1. **Main Meter Readings:** Total consumption from supplier
 2. **Household Meter Readings:** Sum of all individual household meters
 3. **Calculate Difference:** Main meters - Household meters = Distribution losses/gains
-4. **Distribute Adjustment:** Total difference ÷ 14 households = Adjustment per household
+4. **Distribute Adjustment:** Total difference ÷ active households = Adjustment per household
 5. **Adjust Consumption:** Each household's raw consumption + adjustment = Final billable consumption
-6. **Generate Bills:** Full quarterly bills with member fees and shared costs
-
-#### For Monthly Periods with Billing Enabled:
-
-1. **Main Meter Readings:** Optional - can be enabled for reconciliation
-2. **Household Meter Readings:** Required for all households
-3. **Reconciliation Options:**
-   - **With Reconciliation:** Apply same process as quarterly (if main meters read)
+6. **Generate Bills:** Full tertiary bills with member fees and shared costs
    - **Without Reconciliation:** Use raw household readings only
-4. **Generate Bills:** Monthly utility bills only (no member fees or shared costs)
+7. **Generate Bills:** Monthly utility bills only (no member fees or shared costs)
 
 #### For Monthly Periods (Monitoring Only):
 
@@ -1151,19 +1145,17 @@ INSERT INTO billing_periods VALUES
 
 #### Payment Processing:
 
-1. **Quarterly Bills:** Include all costs, due within 30 days
-2. **Monthly Bills:** Utility costs only, due within 15 days
-3. **Outstanding Balances:** Track separately for quarterly vs monthly bills
-4. **Credit/Debit Adjustments:** Applied during next quarterly billing period
+1. **Tertiary Bills:** Include all costs, due within 30 days
+2. **Outstanding Balances:** Track payment status for tertiary bills
+3. **Credit/Debit Adjustments:** Applied during next tertiary billing period
 
 #### User Experience:
 
-1. **Dashboard:** Shows both official and optional readings with billing status
-2. **Notifications:** Reminders for reading deadlines and bill due dates
-3. **Reports:** Monthly consumption trends and cost analysis
-4. **Bill Preview:** Estimate bills using latest readings
-5. **Flexible Configuration:** Admin can enable/disable monthly billing per period
-6. **Bill Preview:** Estimate bills using latest readings
+1. **Dashboard:** Shows tertiary billing overview with payment status
+2. **Email Notifications:** Automated invoices, reminders, and payment confirmations
+3. **Reports:** Consumption trends and cost analysis
+4. **Bill Preview:** Detailed invoice breakdown with PDF generation
+5. **SystemAdmin Interface:** Complete email configuration and testing tools
 
 This approach gives you the best of both worlds:
 
@@ -1239,11 +1231,12 @@ Password: member123
 Current Prisma schema includes:
 
 - Users (authentication & roles)
-- Households (14 households)
+- Households (dynamic households)
 - UtilityServices (Water, Electricity, etc.)
 - HouseholdMeters & MainMeters
 - MeterReadings (household & main)
 - BillingPeriods (tertiary periods)
+- EmailNotifications & Email Queue System
 
 ### API Documentation
 

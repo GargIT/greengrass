@@ -421,3 +421,55 @@ npm run type-check
 - `backend/DEVELOPMENT_IMPROVEMENTS.md` - Backend development setup and improvements
 - `backend/scripts/import-excel-complete.ts` - Complete database reset and Excel import script
 - `.github/copilot-instructions.md` - This file - AI agent instructions
+
+## Documentation Maintenance Requirements
+
+### 📝 CRITICAL: Always Update Documentation Before Commits
+
+**MANDATORY WORKFLOW**: Before making any commit, ensure documentation reflects all changes:
+
+1. **Update Progress Status**: Mark new features as completed in relevant documentation
+2. **Sync Implementation Details**: Update code examples, API endpoints, and database schemas
+3. **Maintain Consistency**: Ensure terminology is consistent across all `.md` files
+4. **Update File References**: Add new important files to key documentation sections
+
+### Documentation Files That Must Stay Current
+
+#### Primary Documentation (Update for ALL changes)
+
+- `ANALYSIS_AND_INSTRUCTIONS.md` - Main project documentation and roadmap
+- `.github/copilot-instructions.md` - AI agent development instructions
+- `README.md` - Project overview and quick start guide
+
+#### Feature-Specific Documentation (Update when relevant)
+
+- `SYSTEM_ADMIN_GUIDE.md` - Email system and administration
+- `backend/DEVELOPMENT_IMPROVEMENTS.md` - Backend development workflows
+- Any feature-specific guides in project root
+
+### When to Update Documentation
+
+**Always update before commit when you:**
+
+- ✅ Add new features or endpoints
+- ✅ Change database schema or business logic
+- ✅ Modify authentication/authorization patterns
+- ✅ Add or change email templates/notifications
+- ✅ Update environment variables or configuration
+- ✅ Change development workflows or scripts
+- ✅ Fix bugs that affect documented behavior
+- ✅ Add new dependencies or tools
+
+### Documentation Update Checklist
+
+Before each commit, verify:
+
+- [ ] Progress section updated with completion status
+- [ ] New code patterns added to development guides
+- [ ] API endpoints documented if changed
+- [ ] Environment variables documented if added
+- [ ] Troubleshooting section updated if relevant
+- [ ] File structure references current if changed
+- [ ] Examples reflect actual implementation
+
+**Remember**: Documentation is code. Keep it as current as your implementation.
