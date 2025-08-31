@@ -71,8 +71,8 @@ await notificationService.sendNewInvoiceNotifications(billingPeriodId);
 
 // Manual email testing (admin only)
 await emailService.sendTemplateEmail(
-  "new_invoice", 
-  "user@example.com", 
+  "new_invoice",
+  "user@example.com",
   templateData
 );
 
@@ -81,7 +81,7 @@ await emailService.queueEmail({
   to: household.email,
   subject: "Test",
   htmlContent: "<p>Hello</p>",
-  scheduledFor: new Date(Date.now() + 3600000) // 1 hour later
+  scheduledFor: new Date(Date.now() + 3600000), // 1 hour later
 });
 ```
 
@@ -144,6 +144,10 @@ docker compose up -d
 
 # Backend setup from root
 cd backend && npm install && npx prisma generate && npx prisma db push
+
+# Complete database reset and Excel import
+cd backend && npx tsx scripts/import-excel-complete.ts
+# WARNING: This clears ALL data and reimports from Gröngräset.xlsx
 ```
 
 ### Development Servers
@@ -260,16 +264,15 @@ export const emailTemplates = {
     name: "new_template",
     subject: "Subject with {{variable}}",
     htmlContent: `<h1>Hello {{ownerName}}</h1>`,
-    variables: ["ownerName", "customData"]
-  }
+    variables: ["ownerName", "customData"],
+  },
 };
 
 // 2. Use in notification service
-await emailService.sendTemplateEmail(
-  "new_template",
-  household.email,
-  { ownerName: "Test", customData: "Value" }
-);
+await emailService.sendTemplateEmail("new_template", household.email, {
+  ownerName: "Test",
+  customData: "Value",
+});
 ```
 
 ### Creating Role-Protected Routes
@@ -286,7 +289,7 @@ router.get("/admin-only", async (req, res) => {
 // Frontend route protection
 <ProtectedRoute requiredRole="ADMIN">
   <AdminOnlyPage />
-</ProtectedRoute>
+</ProtectedRoute>;
 ```
 
 ### Adding New Utility Services
@@ -298,12 +301,30 @@ const service = await prisma.utilityService.create({
     name: "New Service",
     serviceType: "OTHER",
     unit: "kWh",
-    requiresReadings: true
-  }
+    requiresReadings: true,
+  },
 });
 
 // 2. Frontend: Service appears automatically in dropdowns
 // 3. Billing: Included automatically in calculations
+```
+
+### Database Reset and Excel Import
+
+```bash
+# Complete database reset with Excel import
+cd backend && npx tsx scripts/import-excel-complete.ts
+
+# This script will:
+# 1. 🧹 Reset existing data (except users)
+# 2. 💧 Setup utility services and pricing
+# 3. 📥 Import households and readings from Gröngräset.xlsx
+# 4. 📊 Import main meter readings
+# 5. ⚖️ Calculate reconciliation for all periods
+# 6. 💰 Generate bills for all periods
+# 7. 📋 Create quarterly bills with proper dates
+
+# WARNING: This deletes ALL billing data and starts fresh
 ```
 
 ## Troubleshooting
@@ -311,11 +332,13 @@ const service = await prisma.utilityService.create({
 ### Common Issues
 
 **Email not sending:**
+
 1. Check SMTP connection: `curl localhost:3001/api/notifications/test`
 2. Verify .env SMTP configuration
 3. Check email queue status in SystemAdmin
 
 **Database connection issues:**
+
 ```bash
 # Restart PostgreSQL container
 docker compose down && docker compose up -d
@@ -324,7 +347,19 @@ docker compose down && docker compose up -d
 cd backend && npx prisma generate
 ```
 
+**Need fresh data from Excel:**
+
+```bash
+# Complete database reset and import
+cd backend && npx tsx scripts/import-excel-complete.ts
+# This will clear ALL data and reimport from Gröngräset.xlsx
+
+# Check import status
+cd backend && npx tsx scripts/check-services.ts
+```
+
 **Authentication problems:**
+
 ```bash
 # Clear browser localStorage
 localStorage.clear()
@@ -334,6 +369,7 @@ localStorage.clear()
 ```
 
 **Frontend build errors:**
+
 ```bash
 # Clear node_modules and reinstall
 rm -rf node_modules package-lock.json
@@ -357,17 +393,20 @@ npm run type-check
 ## Key Files for Understanding
 
 ### Core Architecture
+
 - `ANALYSIS_AND_INSTRUCTIONS.md` - Detailed project analysis and roadmap
 - `backend/prisma/schema.prisma` - Complete database schema
 - `backend/src/index.ts` - Main server entry point with middleware setup
 
 ### Authentication & Authorization
+
 - `backend/src/routes/auth.ts` - Authentication patterns
 - `backend/src/middleware/auth.ts` - JWT middleware
 - `backend/src/routes/meterReadings.ts` - Role-based data filtering example
 - `frontend/src/pages/MeterReadings.tsx` - Role-based UI patterns
 
 ### Email Notification System
+
 - `backend/src/routes/notifications.ts` - Email notification API endpoints
 - `backend/src/lib/emailService.ts` - Email service with queue and templates
 - `backend/src/lib/notificationService.ts` - Business logic for notifications
@@ -378,5 +417,7 @@ npm run type-check
 - `SYSTEM_ADMIN_GUIDE.md` - Complete guide for email administration
 
 ### Development & Documentation
+
 - `backend/DEVELOPMENT_IMPROVEMENTS.md` - Backend development setup and improvements
+- `backend/scripts/import-excel-complete.ts` - Complete database reset and Excel import script
 - `.github/copilot-instructions.md` - This file - AI agent instructions
