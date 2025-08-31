@@ -225,14 +225,33 @@ export class PDFGenerator {
    * Generate HTML template for invoice
    */
   private static generateInvoiceHTML(billData: BillData): string {
-    const formatCurrency = (amount: number) =>
-      new Intl.NumberFormat("sv-SE", {
+    const formatCurrency = (amount: number) => {
+      const formatted = new Intl.NumberFormat("sv-SE", {
         style: "currency",
         currency: "SEK",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
       }).format(amount);
+      return formatted;
+    };
 
     const formatDate = (date: Date) =>
+      new Intl.DateTimeFormat("sv-SE", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }).format(new Date(date));
+
+    const formatDateShort = (date: Date) =>
       new Intl.DateTimeFormat("sv-SE").format(new Date(date));
+
+    const formatNumber = (num: number, unit: string) => {
+      const formatted = new Intl.NumberFormat("sv-SE", {
+        minimumFractionDigits: unit === "kWh" || unit === "m³" ? 0 : 2,
+        maximumFractionDigits: unit === "kWh" || unit === "m³" ? 0 : 2,
+      }).format(num);
+      return `${formatted} ${unit}`;
+    };
 
     return `
 <!DOCTYPE html>
@@ -517,7 +536,7 @@ export class PDFGenerator {
                     <td>
                         <strong>${utility.serviceName}</strong>
                     </td>
-                    <td>${utility.consumption.toFixed(2)}</td>
+                    <td>${formatNumber(utility.consumption, "")}</td>
                     <td>${utility.unit}</td>
                     <td class="amount">${formatCurrency(
                       utility.pricePerUnit

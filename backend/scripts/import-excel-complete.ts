@@ -166,6 +166,12 @@ async function importExcelDataComplete() {
     await prisma.mainMeter.deleteMany({});
     console.log("✅ Cleared main meters");
 
+    await prisma.notificationSettings.deleteMany({});
+    console.log("✅ Cleared notification settings");
+
+    await prisma.emailQueue.deleteMany({});
+    console.log("✅ Cleared email queue");
+
     await prisma.household.deleteMany({});
     console.log("✅ Cleared households");
 
@@ -339,6 +345,20 @@ async function importExcelDataComplete() {
           isActive: true,
         },
       });
+
+      // Create default notification settings for household
+      await prisma.notificationSettings.create({
+        data: {
+          householdId: household.id,
+          emailEnabled: true,
+          newInvoiceNotification: true,
+          paymentReminderEnabled: true,
+          paymentConfirmationEnabled: true,
+          reminderDaysBefore: 7,
+          monthlySummaryEnabled: false,
+        },
+      });
+      console.log(`✅ Created notification settings for household ${houseNum}`);
 
       // Create household water meter
       const householdMeter = await prisma.householdMeter.create({

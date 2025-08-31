@@ -107,9 +107,20 @@ class EmailService {
       take: 10, // Process max 10 emails at a time
     });
 
+    if (pendingEmails.length === 0) {
+      console.log("📬 Email queue is empty - no emails to process");
+      return;
+    }
+
+    console.log(`📬 Processing ${pendingEmails.length} emails from queue...`);
+
     for (const email of pendingEmails) {
       await this.sendQueuedEmail(email.id);
     }
+
+    console.log(
+      `✅ Finished processing email queue (${pendingEmails.length} emails)`
+    );
   }
 
   /**
@@ -146,19 +157,41 @@ class EmailService {
         data: { status: "SENT", sentAt: new Date() },
       });
 
-      console.log(`Email sent successfully to ${email.to}`);
+      console.log(
+        `📧 Email sent successfully to ${email.to} (${email.subject})`
+      );
     } catch (error) {
-      console.error(`Failed to send email to ${email.to}:`, error);
+      const attemptCount = email.attempts + 1;
+      const maxAttempts = 3;
 
-      // Update with error
+      console.error(
+        `❌ Failed to send email to ${email.to} (attempt ${attemptCount}/${maxAttempts}):`,
+        error
+      );
+
+      // Update with error and increment attempts
       await prisma.emailQueue.update({
         where: { id: emailId },
         data: {
-          status: email.attempts >= 2 ? "FAILED" : "PENDING",
+          status: attemptCount >= maxAttempts ? "FAILED" : "PENDING",
+          attempts: attemptCount,
           errorMessage:
             error instanceof Error ? error.message : "Unknown error",
         },
       });
+
+      // Log final failure
+      if (attemptCount >= maxAttempts) {
+        console.error(
+          `💀 Email permanently failed after ${maxAttempts} attempts: ${email.to} - ${email.subject}`
+        );
+      } else {
+        console.warn(
+          `🔄 Email will be retried (${
+            maxAttempts - attemptCount
+          } attempts remaining): ${email.to}`
+        );
+      }
     }
   }
 
