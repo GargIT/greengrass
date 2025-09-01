@@ -34,9 +34,8 @@ function calculateTertiaryPeriod(readingDate: Date): {
     endDate = new Date(Date.UTC(year, 11, 31)); // December 31
   }
 
-  // Reading deadline is 2 weeks before period end
+  // Reading deadline is same as period end date
   const readingDeadline = new Date(endDate);
-  readingDeadline.setDate(endDate.getDate() - 14);
 
   return { startDate, endDate, readingDeadline };
 }
@@ -74,9 +73,8 @@ async function getOrCreateBillingPeriod(readingDate: Date, periodName: string) {
     endDate = tertiaryPeriod.endDate;
   }
 
-  // Reading deadline is 2 weeks before period end
+  // Reading deadline is same as period end date
   const readingDeadline = new Date(endDate);
-  readingDeadline.setDate(endDate.getDate() - 14);
 
   // Create the new period
   billingPeriod = await prisma.billingPeriod.create({

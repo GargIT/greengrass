@@ -90,6 +90,36 @@ async function setupNotificationSettings() {
         <p>Med vänliga hälsningar,<br>Gröngräset Samfällighetsförening</p>
       `,
     },
+    {
+      name: "meter_reading_reminder",
+      subject:
+        "Påminnelse: Mätaravläsning deadline {{readingDeadline}} - {{periodName}}",
+      htmlContent: `
+        <h2>Mätaravläsning krävs</h2>
+        <p>Hej {{ownerName}},</p>
+        <p>Vi behöver mätaravläsningar från ditt hushåll ({{householdNumber}}) för period {{periodName}}.</p>
+        <p><strong>Deadline:</strong> {{readingDeadline}}</p>
+        <p><strong>Dagar kvar:</strong> {{daysUntilDeadline}}</p>
+        <p><strong>Saknade tjänster:</strong> {{missingServices}}</p>
+        <p>Logga in för att registrera: {{loginUrl}}</p>
+        <p>Med vänliga hälsningar,<br>Gröngräset Samfällighetsförening</p>
+      `,
+    },
+    {
+      name: "meter_reading_urgent",
+      subject:
+        "BRÅDSKANDE: Mätaravläsning försenad - {{periodName}} ({{daysOverdue}} dagar)",
+      htmlContent: `
+        <h2>BRÅDSKANDE: Försenad mätaravläsning</h2>
+        <p>Hej {{ownerName}},</p>
+        <p>Mätaravläsningar från ditt hushåll ({{householdNumber}}) är försenade för period {{periodName}}.</p>
+        <p><strong>Deadline var:</strong> {{readingDeadline}}</p>
+        <p><strong>Försenad med:</strong> {{daysOverdue}} dagar</p>
+        <p><strong>Saknade tjänster:</strong> {{missingServices}}</p>
+        <p>Registrera OMEDELBART: {{loginUrl}}</p>
+        <p>Med vänliga hälsningar,<br>Gröngräset Samfällighetsförening</p>
+      `,
+    },
   ];
 
   for (const template of templates) {
