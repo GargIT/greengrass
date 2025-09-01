@@ -412,9 +412,232 @@ För teknisk support, kontakta systemadministratören.
     variables: ["ownerName", "householdNumber", "email", "loginUrl"],
   },
 
+  meterReadingReminder: {
+    name: "meter_reading_reminder",
+    subject:
+      "Påminnelse: Mätaravläsning deadline imorgon {{readingDeadline}} - {{periodName}}",
+    htmlContent: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #FF9800; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background-color: #f9f9f9; }
+            .deadline-warning { background-color: #fff3cd; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #FF9800; }
+            .missing-services { background-color: white; padding: 15px; margin: 15px 0; border-radius: 5px; }
+            .service-list { list-style-type: disc; margin-left: 20px; }
+            .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+            .button { 
+              display: inline-block; 
+              padding: 12px 24px; 
+              background-color: #FF9800; 
+              color: white; 
+              text-decoration: none; 
+              border-radius: 5px; 
+              margin: 15px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Gröngräset Samfällighetsförening</h1>
+            <h2>Mätaravläsning Påminnelse</h2>
+          </div>
+          
+          <div class="content">
+            <p>Hej {{ownerName}},</p>
+            
+            <div class="deadline-warning">
+              <h3>⏰ Mätaravläsning krävs för {{periodName}}</h3>
+              <p><strong>Deadline:</strong> {{readingDeadline}} (imorgon)</p>
+              <p>Vänligen lämna in dina mätaravläsningar innan deadline.</p>
+            </div>
+            
+            <p>Vi behöver mätaravläsningar från ditt hushåll ({{householdNumber}}) för faktureringen av period {{periodName}}.</p>
+            
+            <div class="missing-services">
+              <h3>Saknade mätaravläsningar:</h3>
+              <ul class="service-list">
+                {{missingServicesHtml}}
+              </ul>
+            </div>
+            
+            <p>För att registrera dina mätaravläsningar, logga in på systemet:</p>
+            <a href="{{loginUrl}}" class="button">Registrera Mätaravläsningar</a>
+            
+            <p><strong>Viktigt:</strong> Alla mätaravläsningar måste vara registrerade innan deadline för att fakturor ska kunna genereras korrekt.</p>
+            
+            <p>Med vänliga hälsningar,<br>
+            Gröngräset Samfällighetsförening</p>
+          </div>
+          
+          <div class="footer">
+            <p>Detta är ett automatiskt meddelande. Svara inte på detta email.</p>
+            <p>För frågor, kontakta styrelsen.</p>
+          </div>
+        </body>
+      </html>
+    `,
+    textContent: `
+Gröngräset Samfällighetsförening - Mätaravläsning Påminnelse
+
+Hej {{ownerName}},
+
+⏰ MÄTARAVLÄSNING KRÄVS FÖR {{periodName}}
+
+Deadline: {{readingDeadline}} (imorgon)
+
+Vi behöver mätaravläsningar från ditt hushåll ({{householdNumber}}) för faktureringen av period {{periodName}}.
+
+Saknade mätaravläsningar:
+{{missingServices}}
+
+För att registrera dina mätaravläsningar, logga in på: {{loginUrl}}
+
+VIKTIGT: Alla mätaravläsningar måste vara registrerade innan deadline för att fakturor ska kunna genereras korrekt.
+
+Med vänliga hälsningar,
+Gröngräset Samfällighetsförening
+
+---
+Detta är ett automatiskt meddelande. Svara inte på detta email.
+För frågor, kontakta styrelsen.
+    `,
+    variables: [
+      "ownerName",
+      "householdNumber",
+      "periodName",
+      "readingDeadline",
+      "missingServices",
+      "missingServicesHtml",
+      "loginUrl",
+    ],
+  },
+
+  meterReadingUrgent: {
+    name: "meter_reading_urgent",
+    subject:
+      "BRÅDSKANDE: Mätaravläsning försenad - {{periodName}} ({{daysOverdue}} dagar)",
+    htmlContent: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f44336; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background-color: #f9f9f9; }
+            .urgent-warning { background-color: #ffebee; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #f44336; }
+            .missing-services { background-color: white; padding: 15px; margin: 15px 0; border-radius: 5px; }
+            .service-list { list-style-type: disc; margin-left: 20px; }
+            .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+            .button { 
+              display: inline-block; 
+              padding: 12px 24px; 
+              background-color: #f44336; 
+              color: white; 
+              text-decoration: none; 
+              border-radius: 5px; 
+              margin: 15px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Gröngräset Samfällighetsförening</h1>
+            <h2>� BRÅDSKANDE: Mätaravläsning Försenad</h2>
+          </div>
+          
+          <div class="content">
+            <p>Hej {{ownerName}},</p>
+            
+            <div class="urgent-warning">
+              <h3>🚨 Försenad mätaravläsning för {{periodName}}</h3>
+              <p><strong>Deadline var:</strong> {{readingDeadline}}</p>
+              <p><strong>Försenad med:</strong> {{daysOverdue}} dagar</p>
+            </div>
+            
+            <p><strong>VIKTIGT:</strong> Vi väntar fortfarande på mätaravläsningar från ditt hushåll ({{householdNumber}}) för period {{periodName}}.</p>
+            
+            <div class="missing-services">
+              <h3>Saknade mätaravläsningar:</h3>
+              <ul class="service-list">
+                {{missingServicesHtml}}
+              </ul>
+            </div>
+            
+            <p>Utan dessa avläsningar kan vi inte:</p>
+            <ul>
+              <li>Generera korrekta fakturor för perioden</li>
+              <li>Utföra nödvändig mätarstämning</li>
+              <li>Säkerställa rättvis kostnadsfördelning</li>
+            </ul>
+            
+            <p><strong>Vänligen registrera dina mätaravläsningar OMEDELBART:</strong></p>
+            <a href="{{loginUrl}}" class="button">Registrera Nu</a>
+            
+            <p>Om du har tekniska problem eller frågor, kontakta styrelsen snarast.</p>
+            
+            <p>Med vänliga hälsningar,<br>
+            Gröngräset Samfällighetsförening</p>
+          </div>
+          
+          <div class="footer">
+            <p>Detta är ett automatiskt meddelande. Svara inte på detta email.</p>
+            <p>För frågor, kontakta styrelsen.</p>
+          </div>
+        </body>
+      </html>
+    `,
+    textContent: `
+Gröngräset Samfällighetsförening - BRÅDSKANDE: Mätaravläsning Försenad
+
+Hej {{ownerName}},
+
+🚨 FÖRSENAD MÄTARAVLÄSNING FÖR {{periodName}}
+
+Deadline var: {{readingDeadline}}
+Försenad med: {{daysOverdue}} dagar
+
+VIKTIGT: Vi väntar fortfarande på mätaravläsningar från ditt hushåll ({{householdNumber}}) för period {{periodName}}.
+
+Saknade mätaravläsningar:
+{{missingServices}}
+
+Utan dessa avläsningar kan vi inte:
+- Generera korrekta fakturor för perioden
+- Utföra nödvändig mätarstämning
+- Säkerställa rättvis kostnadsfördelning
+
+VÄNLIGEN REGISTRERA DINA MÄTARAVLÄSNINGAR OMEDELBART:
+{{loginUrl}}
+
+Om du har tekniska problem eller frågor, kontakta styrelsen snarast.
+
+Med vänliga hälsningar,
+Gröngräset Samfällighetsförening
+
+---
+Detta är ett automatiskt meddelande. Svara inte på detta email.
+För frågor, kontakta styrelsen.
+    `,
+    variables: [
+      "ownerName",
+      "householdNumber",
+      "periodName",
+      "readingDeadline",
+      "daysOverdue",
+      "missingServices",
+      "missingServicesHtml",
+      "loginUrl",
+    ],
+  },
+
   systemNotification: {
     name: "system_notification",
-    subject: "Systemmeddelande från Gröngräset: {{notificationTitle}}",
+    subject: "Meddelande från Gröngräset - {{notificationTitle}}",
     htmlContent: `
       <!DOCTYPE html>
       <html>
@@ -424,22 +647,21 @@ För teknisk support, kontakta systemadministratören.
             body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #2196F3; color: white; padding: 20px; text-align: center; }
             .content { padding: 20px; background-color: #f9f9f9; }
-            .notification-box { background-color: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #2196F3; }
+            .notification-content { background-color: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #2196F3; }
             .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
           </style>
         </head>
         <body>
           <div class="header">
             <h1>Gröngräset Samfällighetsförening</h1>
-            <h2>📢 Systemmeddelande</h2>
+            <h2>{{notificationTitle}}</h2>
           </div>
           
           <div class="content">
             <p>Hej {{ownerName}},</p>
             
-            <div class="notification-box">
-              <h3>{{notificationTitle}}</h3>
-              <div>{{notificationContent}}</div>
+            <div class="notification-content">
+              {{notificationContent}}
             </div>
             
             <p>Detta meddelande skickades {{sentDate}}.</p>

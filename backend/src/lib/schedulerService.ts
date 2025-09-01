@@ -32,6 +32,48 @@ export class SchedulerService {
       }
     );
 
+    // Schedule advance meter reading reminders at 10:00 AM daily
+    cron.schedule(
+      "0 10 * * *",
+      async () => {
+        console.log("🕙 Running advance meter reading reminders...");
+        try {
+          await notificationService.sendMeterReadingAdvanceReminders();
+          await emailService.processQueue();
+          console.log("✅ Advance meter reading reminders completed");
+        } catch (error) {
+          console.error(
+            "❌ Failed to run advance meter reading reminders:",
+            error
+          );
+        }
+      },
+      {
+        timezone: "Europe/Stockholm",
+      }
+    );
+
+    // Schedule overdue meter reading reminders at 11:00 AM daily
+    cron.schedule(
+      "0 11 * * *",
+      async () => {
+        console.log("🕚 Running overdue meter reading reminders...");
+        try {
+          await notificationService.sendMeterReadingOverdueReminders();
+          await emailService.processQueue();
+          console.log("✅ Overdue meter reading reminders completed");
+        } catch (error) {
+          console.error(
+            "❌ Failed to run overdue meter reading reminders:",
+            error
+          );
+        }
+      },
+      {
+        timezone: "Europe/Stockholm",
+      }
+    );
+
     // Process email queue every 5 minutes
     cron.schedule("*/5 * * * *", async () => {
       try {
@@ -61,6 +103,8 @@ export class SchedulerService {
     this.isInitialized = true;
     console.log("📅 Email notification scheduler initialized");
     console.log("   • Daily payment reminders at 9:00 AM");
+    console.log("   • Advance meter reading reminders at 10:00 AM");
+    console.log("   • Overdue meter reading reminders at 11:00 AM");
     console.log("   • Email queue processing every 5 minutes");
     console.log("   • Weekly cleanup on Sundays at 2:00 AM");
   }
@@ -90,6 +134,23 @@ export class SchedulerService {
   async triggerPaymentReminders(): Promise<void> {
     console.log("📧 Manually triggering payment reminders...");
     await notificationService.sendPaymentReminders();
+    await emailService.processQueue();
+  }
+
+  /**
+   * Manual trigger for meter reading reminders (for testing or admin use)
+   */
+  async triggerMeterReadingReminders(
+    reminderType: "advance" | "overdue" = "advance",
+    billingPeriodId?: string
+  ): Promise<void> {
+    console.log(
+      `📧 Manually triggering ${reminderType} meter reading reminders...`
+    );
+    await notificationService.triggerMeterReadingReminders(
+      billingPeriodId,
+      reminderType
+    );
     await emailService.processQueue();
   }
 

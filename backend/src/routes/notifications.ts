@@ -104,12 +104,10 @@ router.put("/settings", async (req, res, next): Promise<void> => {
       validatedData.householdId &&
       validatedData.householdId !== user.householdId
     ) {
-      res
-        .status(403)
-        .json({
-          success: false,
-          message: "Cannot update settings for other households",
-        });
+      res.status(403).json({
+        success: false,
+        message: "Cannot update settings for other households",
+      });
       return;
     }
 
@@ -290,6 +288,96 @@ router.get("/templates", async (req, res, next): Promise<void> => {
     });
 
     res.json({ success: true, data: templates });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Send meter reading reminders manually (admin only)
+router.post(
+  "/send-meter-reading-reminders",
+  async (req, res, next): Promise<void> => {
+    try {
+      if (req.user?.role !== "ADMIN") {
+        res
+          .status(403)
+          .json({ success: false, message: "Admin access required" });
+        return;
+      }
+
+      const { billingPeriodId, reminderType = "advance" } = req.body;
+
+      await notificationService.triggerMeterReadingReminders(
+        billingPeriodId,
+        reminderType
+      );
+
+      res.json({
+        success: true,
+        data: {
+          message: `Meter reading ${reminderType} reminders sent successfully`,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get billing periods for meter reading reminders (admin only)
+router.get("/billing-periods", async (req, res, next): Promise<void> => {
+  try {
+    if (req.user?.role !== "ADMIN") {
+      res
+        .status(403)
+        .json({ success: false, message: "Admin access required" });
+      return;
+    }
+
+    const periods = await prisma.billingPeriod.findMany({
+      orderBy: { startDate: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        periodName: true,
+        periodType: true,
+        startDate: true,
+        endDate: true,
+        readingDeadline: true,
+        _count: {
+          select: {
+            householdMeterReadings: true,
+          },
+        },
+      },
+    });
+
+    // Add status information
+    const periodsWithStatus = periods.map((period) => {
+      const now = new Date();
+      const deadline = new Date(period.readingDeadline);
+
+      let status = "upcoming";
+      let daysToDeadline = Math.floor(
+        (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (daysToDeadline < 0) {
+        status = "overdue";
+        daysToDeadline = Math.abs(daysToDeadline);
+      } else if (daysToDeadline <= 3) {
+        status = "deadline_soon";
+      }
+
+      return {
+        ...period,
+        status,
+        daysToDeadline,
+        hasReadings: period._count.householdMeterReadings > 0,
+      };
+    });
+
+    res.json({ success: true, data: periodsWithStatus });
   } catch (error) {
     next(error);
   }

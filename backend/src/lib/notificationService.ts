@@ -211,6 +211,203 @@ export class NotificationService {
     await emailService.processQueue();
   }
 
+  /**
+   * Send advance meter reading reminders (before deadline)
+   */
+  async sendMeterReadingAdvanceReminders(): Promise<void> {
+    console.log("Sending advance meter reading reminders...");
+
+    // Find billing periods with reading deadline tomorrow (1 day from now)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const upcomingPeriods = await prisma.billingPeriod.findMany({
+      where: {
+        readingDeadline: {
+          gte: new Date(tomorrow.getTime() - 24 * 60 * 60 * 1000), // Start of day tomorrow
+          lt: new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000), // End of day tomorrow
+        },
+      },
+    });
+
+    for (const period of upcomingPeriods) {
+      await this.sendMeterReadingRemindersForPeriod(period.id, false);
+    }
+  }
+
+  /**
+   * Send overdue meter reading reminders (after deadline)
+   */
+  async sendMeterReadingOverdueReminders(): Promise<void> {
+    console.log("Sending overdue meter reading reminders...");
+
+    // Find billing periods where deadline has passed
+    const overduePeriodsResult = await prisma.billingPeriod.findMany({
+      where: {
+        readingDeadline: { lt: new Date() },
+      },
+    });
+
+    for (const period of overduePeriodsResult) {
+      // Check if we should send reminder
+      const daysSinceDeadline = Math.floor(
+        (Date.now() - period.readingDeadline.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      // Send on day 1 (first day after deadline), then every other day (day 3, 5, 7, etc.)
+      if (
+        daysSinceDeadline === 1 ||
+        (daysSinceDeadline > 1 && daysSinceDeadline % 2 === 1)
+      ) {
+        await this.sendMeterReadingRemindersForPeriod(period.id, true);
+      }
+    }
+  }
+
+  /**
+   * Send meter reading reminders for a specific billing period
+   */
+  async sendMeterReadingRemindersForPeriod(
+    billingPeriodId: string,
+    isOverdue: boolean = false
+  ): Promise<void> {
+    const billingPeriod = await prisma.billingPeriod.findUnique({
+      where: { id: billingPeriodId },
+    });
+
+    if (!billingPeriod) {
+      console.error(`Billing period ${billingPeriodId} not found`);
+      return;
+    }
+
+    // Get households that are missing meter readings
+    const activeHouseholds = await prisma.household.findMany({
+      where: { isActive: true },
+      include: {
+        notificationSettings: true,
+        householdMeters: {
+          include: {
+            service: true,
+            readings: {
+              where: { billingPeriodId },
+            },
+          },
+        },
+      },
+    });
+
+    const loginUrl = process.env.FRONTEND_URL || "http://localhost:5174";
+
+    for (const household of activeHouseholds) {
+      if (!household.email) {
+        continue;
+      }
+
+      // Check notification settings
+      const settings = household.notificationSettings;
+      if (!settings?.emailEnabled || !settings?.newInvoiceNotification) {
+        continue; // Use same setting as invoice notifications for now
+      }
+
+      // Find missing meter readings (exclude MEMBERSHIP service)
+      const metersRequiringReadings = household.householdMeters.filter(
+        (meter) =>
+          meter.service.requiresReadings &&
+          meter.service.serviceType !== "MEMBERSHIP"
+      );
+
+      const missingReadings = metersRequiringReadings.filter(
+        (meter) => meter.readings.length === 0
+      );
+
+      if (missingReadings.length === 0) {
+        continue; // This household has all readings
+      }
+
+      const missingServices = missingReadings.map(
+        (meter) => meter.service.name
+      );
+
+      try {
+        const templateName = isOverdue
+          ? "meter_reading_urgent"
+          : "meter_reading_reminder";
+
+        let templateData: any = {
+          ownerName: household.ownerName,
+          householdNumber: household.householdNumber.toString(),
+          periodName: billingPeriod.periodName,
+          readingDeadline: this.formatDate(billingPeriod.readingDeadline),
+          missingServices: missingServices
+            .map((service) => `- ${service}`)
+            .join("\n"),
+          missingServicesHtml: missingServices
+            .map((service) => `<li>${service}</li>`)
+            .join(""),
+          loginUrl,
+        };
+
+        if (isOverdue) {
+          const daysOverdue = Math.floor(
+            (Date.now() - billingPeriod.readingDeadline.getTime()) /
+              (1000 * 60 * 60 * 24)
+          );
+          templateData.daysOverdue = daysOverdue.toString();
+        } else {
+          const daysUntilDeadline = Math.floor(
+            (billingPeriod.readingDeadline.getTime() - Date.now()) /
+              (1000 * 60 * 60 * 24)
+          );
+          templateData.daysUntilDeadline = daysUntilDeadline.toString();
+        }
+
+        await emailService.sendNotificationToHousehold(
+          household.id,
+          templateName,
+          templateData,
+          "newInvoiceNotification" // Use same setting as invoice notifications
+        );
+
+        const reminderType = isOverdue ? "överdue" : "advance";
+        console.log(
+          `✅ Meter reading ${reminderType} reminder sent to household ${household.householdNumber} for period ${billingPeriod.periodName}`
+        );
+      } catch (error) {
+        console.error(
+          `❌ Failed to send meter reading reminder to household ${household.householdNumber}:`,
+          error
+        );
+      }
+    }
+  }
+
+  /**
+   * Manual trigger for meter reading reminders (for testing or admin use)
+   */
+  async triggerMeterReadingReminders(
+    billingPeriodId?: string,
+    reminderType: "advance" | "overdue" = "advance"
+  ): Promise<void> {
+    console.log(
+      `📧 Manually triggering ${reminderType} meter reading reminders...`
+    );
+
+    if (billingPeriodId) {
+      await this.sendMeterReadingRemindersForPeriod(
+        billingPeriodId,
+        reminderType === "overdue"
+      );
+    } else {
+      if (reminderType === "advance") {
+        await this.sendMeterReadingAdvanceReminders();
+      } else {
+        await this.sendMeterReadingOverdueReminders();
+      }
+    }
+
+    await emailService.processQueue();
+  }
+
   private formatDate(date: Date): string {
     return date.toLocaleDateString("sv-SE");
   }
